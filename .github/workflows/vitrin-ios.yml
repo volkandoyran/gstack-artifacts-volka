@@ -101,6 +101,9 @@ jobs:
 
   ios:
     name: Xcode derlemesi ve simülatör denemesi
+    # macOS dakikaları özel depolarda 10 kat sayıldığı için, yalnızca testleri ilgilendiren
+    # gönderimlerde commit mesajına [ios-atla] yazılarak bu iş atlanabilir.
+    if: ${{ !contains(github.event.head_commit.message, '[ios-atla]') }}
     runs-on: macos-15
     timeout-minutes: 40
     defaults:
