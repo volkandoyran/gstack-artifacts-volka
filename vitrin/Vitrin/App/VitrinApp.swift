@@ -4,7 +4,7 @@ import AVFoundation
 @main
 struct VitrinApp: App {
     @AppStorage("ageConfirmed") private var ageConfirmed = false
-    /// Son açık sekme hatırlanır (0 = Keşfet, 1 = Ayarlar)
+    /// Son açık sekme hatırlanır (0 = Keşfet, 1 = Favoriler, 2 = Ayarlar)
     @AppStorage("selectedTab") private var selectedTab = 0
 
     init() {
@@ -17,7 +17,8 @@ struct VitrinApp: App {
             if ageConfirmed {
                 TabView(selection: $selectedTab) {
                     BrowseView().tabItem { Label("Keşfet", systemImage: "square.grid.2x2") }.tag(0)
-                    SettingsView().tabItem { Label("Ayarlar", systemImage: "gearshape") }.tag(1)
+                    FavoritesView().tabItem { Label("Favoriler", systemImage: "star") }.tag(1)
+                    SettingsView().tabItem { Label("Ayarlar", systemImage: "gearshape") }.tag(2)
                 }
             } else {
                 AgeGateView { ageConfirmed = true }

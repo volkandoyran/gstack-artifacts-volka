@@ -86,7 +86,7 @@ final class ProviderParsingTests: XCTestCase {
         XCTAssertEqual(a.maxHeight, 1080)
         XCTAssertEqual(a.thumbnail?.absoluteString, "https://thumb-cdn77.xvideos-cdn.com/16796c5d/0/xv_29_t.jpg")
         XCTAssertEqual(a.pageURL?.absoluteString, "https://www.xvideos.com/video.ufimdcde2e5/sample_massage_session")
-        XCTAssertEqual(a.embedURL?.absoluteString, "https://www.xvideos.com/embedframe/83000781")
+        XCTAssertEqual(a.embedURL?.absoluteString, "https://www.xvideos.com/embedframe/ufimdcde2e5")
         XCTAssertEqual(list[1].durationSec, 3900)
         XCTAssertEqual(list[1].views, 18_500)
         XCTAssertEqual(list[1].thumbnail?.absoluteString, "https://thumb.example/2.jpg")
@@ -219,17 +219,6 @@ final class ProviderParsingTests: XCTestCase {
         XCTAssertEqual(s?.name, "ornek-site.com")
         XCTAssertNil(WordPressSite.custom(name: "x", address: "bozuk", language: .tr, hentaiOnly: false))
         XCTAssertEqual(WordPressSite.custom(name: "A", address: "http://a.b.com", language: .en, hentaiOnly: true)?.baseURL, "http://a.b.com")
-    }
-
-    // MARK: hanime
-
-    func testHanimeHits() throws {
-        let hits = #"[{"id":3427,"name":"Sample Episode 1","slug":"sample-episode-1","views":120000,"likes":900,"dislikes":100,"cover_url":"https://cdn/x.jpg","tags":["vanilla","uncensored"],"created_at":1700000000,"duration_in_ms":960000}]"#
-        let v = try XCTUnwrap(HanimeProvider.videos(fromHits: hits).first)
-        XCTAssertEqual(v.id, "hanime:3427")
-        XCTAssertEqual(v.durationSec, 960)
-        XCTAssertEqual(v.rating, 90, accuracy: 0.01)
-        XCTAssertEqual(v.extra, "sample-episode-1")
     }
 
     // MARK: HLS

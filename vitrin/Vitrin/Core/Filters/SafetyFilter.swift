@@ -3,9 +3,6 @@ import Foundation
 /// Reşit olmayanları çağrıştıran (ve hayvan içeren) içerikleri her zaman eler.
 /// Ayarlardan kapatılamaz. Hem sonuçlara hem arama terimlerine uygulanır.
 enum SafetyFilter {
-    /// hanime gibi sunuculara "blacklist" olarak da gönderilir.
-    static let hardBlockedTags = ["loli", "shota"]
-
     // Desenler ASCII'ye sadeleştirilmiş metne uygulanır (ç->c, ş->s, ı->i …).
     private static let always = [
         // İngilizce / Japonca

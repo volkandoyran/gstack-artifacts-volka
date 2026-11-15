@@ -1,18 +1,27 @@
 # Vitrin
 
-Kişisel kullanım için, birden çok yetişkin video sitesinden içerik toplayan SwiftUI (iOS 17+) uygulaması.
-App Store bu tür uygulamaları kabul etmez; **yan yükleme (sideload)** ile kurulur.
+Kişisel kullanım için, birden çok yetişkin video sitesinden içerik toplayan uygulama. İki sürümü var:
+
+| | Yerel uygulama (bu klasör) | Web sürümü (`web/`) |
+|---|---|---|
+| Kurulum | `.ipa` — Sideloadly/AltStore ile, bilgisayar gerekir, ücretsiz Apple ID ile 7 günde bir yenilenir | **Profil (Web Clip)** — Safari'den, bilgisayarsız, süresi dolmaz |
+| Kaynaklar | 7 kaynağın hepsi doğrudan | Aracı (ücretsiz Cloudflare Worker) ile 7 kaynak; aracısız yalnızca Eporner |
+| Oynatma | XVideos, XNXX, Doeda: uygulamanın kendi oynatıcısı + kalite menüsü; diğerleri kilitli gömülü oynatıcı | Her zaman korumalı gömülü oynatıcı |
+| Durum | Xcode'da derleniyor, simülatörde çalışıyor (GitHub Actions) | Testleri ve tarayıcı denemesi geçiyor; henüz yayınlanmadı |
+
+Web sürümünün kurulumu: [`web/README.md`](web/README.md). App Store bu tür uygulamaları kabul etmez.
 
 ## Özellikler
 
 | İstek | Nasıl yapıldı |
 |---|---|
 | DNS/VPN'den etkilensin, engellemesin | Yalnızca `URLSession` varsayılan ayarı kullanılır; özel DNS/DoH/proxy yok (`Core/HTTP.swift`). iOS'taki DNS profili ve VPN tüneli olduğu gibi kullanılır. Engelli bir kaynak için hata mesajı "VPN/DNS'i kontrol et" der. |
-| Farklı siteler | 8 yerleşik kaynak (aşağıda) + Ayarlar'dan alan adı yazarak eklenen WordPress siteleri. |
+| Farklı siteler | 7 yerleşik kaynak (aşağıda) + Ayarlar'dan alan adı yazarak eklenen WordPress siteleri. |
 | Türk siteleri | **Doeda** (doeda.com) ve **Doeda One** (doeda.one) yerleşik. Türk sitelerine arama terimleri Türkçe, yabancı sitelere İngilizce gönderilir. |
 | Kategoriler + birlikte arama | 26 gerçek + 18 hentai kategori. Birden fazla seçince **VE** (hepsi birlikte) ya da **VEYA** (her biri ayrı aranıp birleştirilir). |
 | Sıralama | İlgili, En yeni, En çok izlenen, En yüksek puan, En uzun, En kısa. Önce sitenin kendi sıralaması istenir, sonra birleşik liste uygulamada yeniden sıralanır. |
 | Aynı video tekrar görünmesin | **Yinelenen filtresi** (Kapalı / Normal / Sıkı) + **İzlediklerimi gizle**. Ayrıntı aşağıda. |
+| Favoriler | Oynatıcıdaki ★ ile kaydedilir; ayrı sekmede listelenir (cihazda saklanır). |
 | Video açılırken site açılmasın | Doğrudan akış varsa uygulamanın kendi oynatıcısı (`AVPlayer`). Yoksa yalnızca oynatıcı çerçevesi, uygulamanın ürettiği boş bir sayfanın içinde açılır: siteye hiç istek yapılmaz, çıkış linkleri / pop-up'lar / `window.open` engellenir, reklam ağları bloklanır, çerez saklanmaz. |
 | Kalite ayarı | Ayarlar'da varsayılan kalite; oynatıcının sağ üstünde Otomatik / 1080p / 720p… menüsü (izlerken değişir, kaldığı yerden devam eder). Gömülü oynatıcılarda o oynatıcının kendi ⚙︎ menüsü. |
 | Ücretsiz yapay zekâ | **Gemini** ve **GPT** (aşağıda). ✨ düğmesi yazdığın tarifi iki dilde etiketlere çevirir. |
@@ -22,22 +31,24 @@ başlık/etiket/arama terimi düzeyinde her zaman süzülür; bu kapatılamaz. A
 
 ## Kaynaklar
 
-| Kaynak | Yöntem | Oynatma | Durum |
-|---|---|---|---|
-| XVideos | Arama sayfası HTML'i | Yerel oynatıcı (HLS, kalite menüsü) | Arama ve akış çıkarma gerçek sayfalarla test edildi |
-| XNXX | Arama sayfası HTML'i | Yerel oynatıcı (HLS, kalite menüsü) | Arama gerçek sayfayla test edildi; video sayfası XVideos ile aynı altyapı (ayrıca denenmedi) |
-| Eporner | Resmi JSON API | Gömülü oynatıcı | Gerçek yanıtla doğrulandı |
-| Pornhub | Webmaster JSON API | Gömülü oynatıcı | Gerçek yanıtla test edildi |
-| RedTube | Webmaster JSON API | Gömülü oynatıcı | Gerçek yanıtla test edildi |
-| hanime.tv | Resmi olmayan JSON uç noktaları | Yerel oynatıcı (kalite menüsü) | **Canlı denenmedi** |
-| Doeda (doeda.com) | WordPress JSON API | Akış çıkarılırsa yerel oynatıcı, yoksa kilitli oynatıcı çerçevesi | Arama ve oynatıcı bulma gerçek yanıtlarla test edildi; akış adresi adımı **canlı denenmedi** |
-| Doeda One (doeda.one) | WordPress JSON API | Aynı | Arama gerçek yanıtla test edildi |
+Aşağıdaki sonuçlar GitHub Actions'taki **canlı denemeden** (sitelere gerçek istek) alınmıştır:
 
-"Test edildi" = sitenin gerçek yanıtı kaydedilip ayrıştırıcıdan geçirildi. Uygulamanın kendisi henüz bir iPhone'da
-çalıştırılmadı; ilk çalıştırmada küçük düzeltmeler gerekebilir.
+| Kaynak | Yöntem | Canlı deneme sonucu |
+|---|---|---|
+| XVideos | Arama sayfası HTML'i | 24 sonuç; yerel oynatıcı: Otomatik, 480p, 360p, 250p; akışa erişildi |
+| XNXX | Arama sayfası HTML'i | 36 sonuç; yerel oynatıcı: Otomatik, 480p, 360p; akışa erişildi |
+| Eporner | Resmi JSON API | 30 sonuç; gömülü oynatıcı |
+| Pornhub | Webmaster JSON API | 30 sonuç; gömülü oynatıcı |
+| RedTube | Webmaster JSON API | 20 sonuç; gömülü oynatıcı |
+| Doeda (doeda.com) | WordPress JSON API | 20 sonuç; yerel oynatıcı: 720p |
+| Doeda One (doeda.one) | WordPress JSON API | 20 sonuç; gömülü oynatıcı çerçevesi (jetplayer) |
 
-Tube8 ve YouPorn'un herkese açık API'leri kapatılmış; hentaihaven / hentai.tv / hentaiturk standart bir API sunmuyor,
-bu yüzden eklenmedi. Hentai aramaları hanime'ye ek olarak karma sitelerde de ("hentai …" olarak) yapılır.
+Deneme bir kez, GitHub'ın ABD'deki sunucularından yapıldı; Türkiye'den VPN/DNS ile sonuç farklı olabilir. Siteler
+yapısını değiştirirse ilgili kaynak bozulur; her gönderimde canlı deneme yeniden çalışır ve tabloyu iş özetine yazar.
+
+**hanime.tv kaldırıldı:** arama sunucusu artık yok, yeni API'si şifreli bir el sıkışma istiyor. Hentai aramaları
+karma sitelerde ("hentai …" olarak) yapılıyor. Tube8 ve YouPorn'un herkese açık API'leri kapatılmış;
+hentaihaven / hentai.tv / hentaiturk standart bir API sunmuyor.
 
 ### Kendi siteni eklemek
 Ayarlar → **Site ekle (WordPress)** → alan adını yaz (örn. `ornek.com`), dilini seç. Site WordPress'in standart
@@ -92,9 +103,13 @@ Signing & Capabilities'te kendi Apple ID'ni seç, `PRODUCT_BUNDLE_IDENTIFIER`'ı
 (Ücretsiz Apple ID ile imza 7 gün geçerlidir.)
 
 ### Mac yoksa
-Bu klasörü bir GitHub deposuna it. `.github/workflows/build-ipa.yml` macOS'ta testleri çalıştırıp
-**imzasız IPA** üretir (Actions → son çalışma → Artifacts). Bunu **SideStore**, **AltStore** veya
-**Sideloadly** ile kendi Apple ID'nle imzalayıp yükle.
+Depoya her gönderimde `.github/workflows/vitrin-ios.yml` GitHub'ın macOS makinesinde Xcode ile derler, uygulamayı
+simülatörde açıp dener ve **Vitrin.ipa** üretir: *Actions → Vitrin iOS → son yeşil çalışma → Artifacts → vitrin-N*.
+İçindeki `Vitrin.ipa`'yı **Sideloadly** (Windows/Mac), **AltStore** ya da **SideStore** ile kendi Apple ID'nle yükle.
+Aynı pakette simülatör ekran görüntüleri (18+ onayı, Ayarlar) ve uygulama günlüğü de bulunur.
+
+Not: depo özel olduğu için macOS derlemeleri GitHub'ın ücretsiz dakika kotasından 10 kat hızlı düşer
+(bir çalışma ≈ 5 dakika ≈ 50 kota dakikası; ücretsiz planda ayda 2000).
 
 ## Geliştirme
 
@@ -102,14 +117,32 @@ Bu klasörü bir GitHub deposuna it. `.github/workflows/build-ipa.yml` macOS'ta 
 Vitrin/Core/   Arayüzden bağımsız mantık: kaynaklar, filtreler, yapay zekâ, arama planı
 Vitrin/App/    SwiftUI arayüzü, oynatıcılar
 Tests/         Çekirdek testleri
+web/           Profil ile kurulan web sürümü ve aracı
 ```
-`swift test` çekirdeği macOS ya da Linux'ta test eder (47 test). Sitelerden kaydettiğin gerçek yanıtlarla denemek için:
+`swift test` çekirdeği macOS ya da Linux'ta test eder. Sitelere gerçek istek atan deneme:
+`VITRIN_LIVE=1 swift test --filter LiveProviderTests`. Kaydettiğin gerçek yanıtlarla denemek için:
 `VITRIN_SAMPLES=/klasör swift test` (dosya adları `Tests/VitrinCoreTests/RealSampleTests.swift` içinde).
+
+GitHub Actions iş akışları (depo kökünde `.github/workflows/`):
+
+| İş akışı | Ne yapar |
+|---|---|
+| `vitrin-ios.yml` | Çekirdek testleri (Linux), canlı kaynak denemesi, web uyumluluk ölçümü, Xcode derlemesi + simülatör denemesi + IPA |
+| `vitrin-web.yml` | Web sürümünün testleri, tarayıcıda uçtan uca deneme, (anahtar varsa) Cloudflare'e yayın |
+| `vitrin-ai.yml` | `.github/ai/vitrin-istem.md` dosyasındaki soruları ücretsiz yapay zekâlara sorar (aşağıya bak) |
+
+### Geliştirirken yapay zekâya danışma
+`.github/ai/vitrin-istem.md` değiştirilip gönderilince iş akışı soruları sorar, yanıtları iş özetine yazar.
+- **GPT (Pollinations):** anahtarsız çalışır ama ücretsiz kullanımda 45 saniyede bir yanıt ve kısa yanıt sınırı var.
+- **Gemini:** depo → *Settings → Secrets and variables → Actions* → `GEMINI_API_KEY` eklenirse sorulur
+  (anahtar aistudio.google.com'dan ücretsiz).
+- **GitHub Models (ücretsiz GPT-4.1):** şu an bu depodan erişilemiyor (uç nokta yalnızca "OK" döndürüyor).
 
 ## Bilinen sınırlamalar
 
 - XVideos/XNXX ve Türk siteleri sayfa yapısına bağlıdır; site tasarımını değiştirirse ilgili dosya güncellenmelidir.
   Bir kaynak bozulursa yalnızca o hata verir, diğerleri çalışmaya devam eder.
+- Web sürümünde oynatma her zaman gömülü oynatıcıyladır; uygulama içi kalite menüsü yalnızca yerel sürümde var.
 - Türk sitelerinin API'si video süresi vermez: bu kaynaklarda "en uzun/en kısa" sıralaması ve süreye dayalı
   yinelenen tespiti çalışmaz.
 - Türk siteleri başlıkları Türkçe yeniden yazdığı için, aynı videonun yabancı sitedeki kopyasıyla eşleştirilemez.

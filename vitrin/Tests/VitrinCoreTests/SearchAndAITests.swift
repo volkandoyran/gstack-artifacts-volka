@@ -49,8 +49,11 @@ final class AIReplyParsingTests: XCTestCase {
 }
 
 final class SearchPlannerTests: XCTestCase {
+    /// Yalnızca hentai içeren, kullanıcının eklediği bir site
+    private static let hentaiSite = WordPressSite(id: "wp-h.example", name: "H", baseURL: "https://h.example",
+                                                  language: .en, hentaiOnly: true)
     private let providers: [any ContentProvider] = [
-        EpornerProvider(), HanimeProvider(), WordPressProvider(site: .doeda),
+        EpornerProvider(), WordPressProvider(site: hentaiSite), WordPressProvider(site: .doeda),
     ]
     private func cat(_ id: String) -> AppCategory { CategoryCatalog.all.first { $0.id == id }! }
 
@@ -58,7 +61,7 @@ final class SearchPlannerTests: XCTestCase {
         let jobs = SearchPlanner.jobs(providers: providers, kindFilter: .real,
                                       selected: [cat("r-blonde"), cat("r-massage")],
                                       free: TagTranslator.bilingual("ofis"), combine: .all, sort: .newest, page: 1)
-        XCTAssertEqual(jobs.count, 2)   // hanime sadece hentai
+        XCTAssertEqual(jobs.count, 2)   // üçüncü site sadece hentai
         XCTAssertEqual(jobs.first { $0.provider.id == "eporner" }?.query.terms, ["blonde", "massage", "office"])
         XCTAssertEqual(jobs.first { $0.provider.id == "wp-doeda.com" }?.query.terms, ["sarışın", "masaj", "ofis"])
     }
@@ -78,12 +81,12 @@ final class SearchPlannerTests: XCTestCase {
         let summary = Set(jobs.map { "\($0.provider.id)|\($0.query.kind.rawValue)|\($0.query.terms.joined(separator: "+"))" })
         XCTAssertEqual(summary, [
             "eporner|real|blonde", "wp-doeda.com|real|sarışın",
-            "eporner|hentai|elf", "hanime|hentai|elf", "wp-doeda.com|hentai|elf",
+            "eporner|hentai|elf", "wp-h.example|hentai|elf", "wp-doeda.com|hentai|elf",
         ])
-        // Karma sitelerde hentai sorgusuna "hentai" eklenir; hanime'de eklenmez.
+        // Karma sitelerde hentai sorgusuna "hentai" eklenir; yalnızca hentai olan sitede eklenmez.
         let q = SearchQuery(terms: ["elf"], kind: .hentai, sort: .relevance, page: 1)
         XCTAssertEqual(EpornerProvider().effectiveTerms(q), ["hentai", "elf"])
-        XCTAssertEqual(HanimeProvider().effectiveTerms(q), ["elf"])
+        XCTAssertEqual(WordPressProvider(site: Self.hentaiSite).effectiveTerms(q), ["elf"])
     }
 
     func testNoSelectionBrowsesEverything() {
@@ -110,6 +113,6 @@ final class SearchPlannerTests: XCTestCase {
     func testRegistryHasAllBuiltInSources() {
         let ids = ProviderRegistry.builtIn.map(\.id)
         XCTAssertEqual(Set(ids).count, ids.count, "kimlikler benzersiz olmalı")
-        XCTAssertEqual(Set(ids), ["xvideos", "xnxx", "eporner", "pornhub", "redtube", "hanime", "wp-doeda.com", "wp-doeda.one"])
+        XCTAssertEqual(Set(ids), ["xvideos", "xnxx", "eporner", "pornhub", "redtube", "wp-doeda.com", "wp-doeda.one"])
     }
 }

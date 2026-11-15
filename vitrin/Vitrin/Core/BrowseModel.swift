@@ -200,8 +200,9 @@ final class BrowseModel {
         guard gen == generation else { return }   // bu arada yeni arama başlamış
 
         // 1) güvenlik  2) aynı kimlik  3) izlenenler  4) yinelenenler  5) sıralama
-        var batch = SearchPlanner.interleave(buckets)
-            .filter { SafetyFilter.isAllowed($0) && seen.insert($0.id).inserted }
+        // Daha önce görülmemiş kimlikler. Hiç yenisi yoksa (site aynı sayfayı tekrar veriyorsa) liste bitmiştir.
+        let fresh = SearchPlanner.interleave(buckets).filter { seen.insert($0.id).inserted }
+        var batch = fresh.filter(SafetyFilter.isAllowed)
         if FilterSettings.hideWatched {
             let before = batch.count
             batch.removeAll { WatchHistory.shared.isWatched($0) }
@@ -214,7 +215,7 @@ final class BrowseModel {
         alternates = dedupe.alternates
         hiddenDuplicates = dedupe.hiddenCount
         failures.merge(errors) { _, new in new }
-        canLoadMore = buckets.contains { !$0.isEmpty }
+        canLoadMore = !fresh.isEmpty
 
         // Otomatik denemeler için (uygulama "-diagnostics" ile başlatılırsa): yalnızca sayılar, başlık yok.
         if ProcessInfo.processInfo.arguments.contains("-diagnostics") {

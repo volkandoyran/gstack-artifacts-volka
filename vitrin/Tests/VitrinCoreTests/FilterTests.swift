@@ -130,3 +130,28 @@ final class WatchHistoryTests: XCTestCase {
         XCTAssertFalse(WatchHistory(defaults: defaults).isWatched(seen))
     }
 }
+
+final class FavoritesStoreTests: XCTestCase {
+    func testFavoritesPersistAndToggle() async {
+        let suite = "vitrin.tests.\(UUID().uuidString)"
+        let a = Video(providerID: "eporner", remoteID: "1", kind: .real, title: "A",
+                      thumbnail: URL(string: "https://cdn/a.jpg"), durationSec: 60, addedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                      tags: ["x"], embedURL: URL(string: "https://e/1"), maxHeight: 720)
+        let b = video("xvideos", "2", "B", 30)
+
+        await MainActor.run {
+            guard let defaults = UserDefaults(suiteName: suite) else { return XCTFail("UserDefaults açılamadı") }
+            defer { defaults.removePersistentDomain(forName: suite) }
+
+            let store = FavoritesStore(defaults: defaults)
+            XCTAssertTrue(store.toggle(a))
+            XCTAssertTrue(store.toggle(b))
+            XCTAssertEqual(store.videos.map(\.id), ["xvideos:2", "eporner:1"], "son eklenen başta")
+
+            let reloaded = FavoritesStore(defaults: defaults)
+            XCTAssertEqual(reloaded.videos, store.videos, "tüm alanlarıyla geri yüklenmeli")
+            XCTAssertFalse(reloaded.toggle(a))
+            XCTAssertEqual(FavoritesStore(defaults: defaults).videos.map(\.id), ["xvideos:2"])
+        }
+    }
+}

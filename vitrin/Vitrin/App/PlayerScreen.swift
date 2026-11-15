@@ -67,6 +67,16 @@ struct PlayerScreen: View {
             .padding()
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    FavoritesStore.shared.toggle(video)
+                } label: {
+                    Image(systemName: FavoritesStore.shared.isFavorite(video) ? "star.fill" : "star")
+                }
+                .accessibilityLabel("Favori")
+            }
+        }
         .task(id: current.id) { await load() }
     }
 

@@ -59,6 +59,7 @@ struct XVideosProvider: ContentProvider {
             let openTag = String(html[r])
             let block = String(html[r.lowerBound..<end])
 
+            let eid = Rx.first(#"data-eid="([0-9a-z]+)""#, in: openTag)?[1]
             guard let numericID = Rx.first(#"data-id="(\d+)""#, in: openTag)?[1],
                   let href = Rx.first(#"href="([^"]*/video[.\-][^"]+)""#, in: block)?[1],
                   let page = URL(string: href.htmlDecoded, relativeTo: URL(string: "https://\(site.host)/"))?.absoluteURL
@@ -88,7 +89,7 @@ struct XVideosProvider: ContentProvider {
                 durationSec: duration,
                 views: viewsText.map(Fmt.count(fromCompact:)) ?? 0,
                 rating: rating,
-                embedURL: URL(string: "https://\(site.host)/embedframe/\(numericID)"),
+                embedURL: URL(string: "https://\(site.host)/embedframe/\(eid ?? numericID)"),
                 pageURL: page,
                 maxHeight: height
             ))

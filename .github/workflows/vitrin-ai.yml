@@ -81,10 +81,16 @@ jobs:
           for i, soru in enumerate(sorular, 1):
               metin = f'{baglam}\n\n{soru}'.strip()
               rapor.append(f'\n## Soru {i}\n\n> ' + soru.replace('\n', '\n> '))
-              try:
-                  rapor.append(f'\n### GPT (Pollinations · openai)\n\n{pollinations(metin)}')
-              except Exception as e:
-                  hatalar.append(f'Soru {i} · Pollinations: {hata(e)}')
+              # Pollinations ücretsiz kullanımda IP başına 45 saniyede bir yanıt veriyor; bir kez yeniden dene.
+              for deneme in (1, 2):
+                  try:
+                      rapor.append(f'\n### GPT (Pollinations · openai)\n\n{pollinations(metin)}')
+                      break
+                  except Exception as e:
+                      if deneme == 2:
+                          hatalar.append(f'Soru {i} · Pollinations: {hata(e)}')
+                      else:
+                          time.sleep(50)
               if gemini_key:
                   try:
                       model, yanit = gemini(metin)
@@ -96,7 +102,7 @@ jobs:
                       rapor.append(f'\n### GPT-4.1 (GitHub Models)\n\n{github_models(metin)}')
                   except Exception as e:
                       hatalar.append(f'GitHub Models: {hata(e)}')
-              time.sleep(3)
+              time.sleep(50)
           if not gemini_key:
               hatalar.append('Gemini: GEMINI_API_KEY eklenmemiş, atlandı')
           rapor.append('\n## Yanıt vermeyenler\n\n' + ('\n'.join(f'- {h}' for h in hatalar) or '- yok') + '\n')

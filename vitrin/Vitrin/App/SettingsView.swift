@@ -56,7 +56,7 @@ struct SettingsView: View {
                 ForEach(QualityPreference.allCases) { Text($0.title).tag($0.rawValue) }
             }
         } header: { Text("Video") } footer: {
-            Text("Doğrudan akış veren kaynaklarda (XVideos, XNXX, hanime; akışı çıkarılabildiğinde Türk siteleri) video uygulamanın kendi oynatıcısında açılır ve kalite menüsü oynatıcının sağ üstündedir. Yalnızca gömülü oynatıcı veren kaynaklarda (Pornhub, RedTube, Eporner) kalite o oynatıcının ⚙︎ menüsünden seçilir.")
+            Text("Doğrudan akış veren kaynaklarda (XVideos, XNXX; akışı çıkarılabildiğinde Doeda gibi Türk siteleri) video uygulamanın kendi oynatıcısında açılır ve kalite menüsü oynatıcının sağ üstündedir. Yalnızca gömülü oynatıcı veren kaynaklarda (Pornhub, RedTube, Eporner) kalite o oynatıcının ⚙︎ menüsünden seçilir.")
         }
     }
 

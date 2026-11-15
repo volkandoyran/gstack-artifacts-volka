@@ -38,7 +38,6 @@ enum ProviderRegistry {
         EpornerProvider(),
         PornhubProvider(),
         RedTubeProvider(),
-        HanimeProvider(),
         WordPressProvider(site: .doeda),
         WordPressProvider(site: .doedaOne),
     ]

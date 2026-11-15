@@ -71,7 +71,7 @@ enum QualityPreference: Int, CaseIterable, Identifiable, Sendable {
 
 // MARK: - Video
 
-struct Video: Identifiable, Hashable, Sendable {
+struct Video: Identifiable, Hashable, Sendable, Codable {
     let providerID: String
     let remoteID: String
     var id: String { "\(providerID):\(remoteID)" }
@@ -92,7 +92,7 @@ struct Video: Identifiable, Hashable, Sendable {
     let pageURL: URL?
     /// Listede görünen en yüksek çözünürlük (örn. 1080), bilinmiyorsa nil
     let maxHeight: Int?
-    /// Sağlayıcıya özel ek bilgi (örn. hanime slug'ı)
+    /// Sağlayıcıya özel ek bilgi (gerekirse)
     let extra: String?
 
     init(providerID: String, remoteID: String, kind: ContentKind, title: String,
