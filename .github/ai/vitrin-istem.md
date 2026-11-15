@@ -1,22 +1,17 @@
-Kişisel kullanım için bir iOS uygulaması (SwiftUI, iOS 17+) geliştiriyorum ve bir sonraki sürüm için fikir danışmak istiyorum. Türkçe, kısa ve somut yanıt ver.
+Kişisel kullanım için bir iOS uygulaması geliştiriyorum ve fikir danışıyorum. Türkçe yanıt ver; en fazla 180 kelime, madde madde, giriş ve kapanış cümlesi yazma.
 
-## Uygulama
+Uygulama: yetişkinlere yönelik (18+), yasal video sitelerinin arama sonuçlarını tek listede toplayan bir "video toplayıcı". İçerik barındırmaz, indirme yapmaz. İki sürümü var: yerel SwiftUI uygulaması ve ana ekrana profil (Web Clip) ile kurulan web uygulaması.
 
-Yetişkinlere yönelik (18+), yasal video sitelerinin arama sonuçlarını tek listede toplayan bir "video toplayıcı". İçerik barındırmaz, indirme yapmaz; yalnızca sitelerin herkese açık arama uç noktalarını/sayfalarını okur. App Store'a gönderilmeyecek, kullanıcı kendi telefonuna yan yükleyecek.
+Şu an olanlar: 7 kaynak site (eklenti yapısı), kullanıcının WordPress sitesi ekleyebilmesi; çoklu kategori seçimi (VE/VEYA), 6 sıralama ölçütü, sonsuz kaydırma; Türkçe-İngilizce arama terimi sözlüğü; siteyi açmadan yalnızca oynatıcı çerçevesini gösteren kilitli oynatıcı; başlık+süre ile yinelenen video filtresi (Jaccard >= 0.75, süre farkı <= %1); izlenenleri gizleme; favoriler; reşit olmayanları çağrıştıran her şeyi eleyen kapatılamaz güvenlik filtresi.
 
-Şu an olanlar:
-- 8 kaynak (JSON API'li siteler, HTML'i ayrıştırılan siteler, WordPress tabanlı Türk siteleri); her kaynak bir `ContentProvider` eklentisi. Kullanıcı Ayarlar'dan WordPress sitesi ekleyebiliyor.
-- Kategoriler (çoklu seçim, VE / VEYA birleştirme), 6 sıralama ölçütü, sonsuz kaydırma.
-- Türk sitelerine Türkçe, yabancı sitelere İngilizce arama terimi gönderen çevrimdışı sözlük.
-- Oynatma: doğrudan akış (HLS) varsa AVPlayer + kalite menüsü; yoksa yalnızca oynatıcı çerçevesini gösteren, gezinmesi kilitli WKWebView (site açılmaz, pop-up ve reklam ağları engelli, çerez saklanmaz).
-- Yinelenen video filtresi: başlık sadeleştirilir (küçük harf, aksanlar, anlamsız kelimeler atılır), kelime kümesi + süre karşılaştırılır (Jaccard ≥ 0.75 ve süre farkı ≤ %1). Gizlenen kopya "diğer kaynak" olarak saklanır.
-- İzlenenleri gizleme (cihazda tutulan geçmiş).
-- Reşit olmayanları çağrıştıran başlık/etiket/arama terimlerini her zaman eleyen, kapatılamayan güvenlik filtresi.
-- Ağ: yalnızca varsayılan URLSession; kullanıcının DNS/VPN ayarına dokunulmaz.
+---
 
-## Sorular
+Soru: Bu uygulamaya eklenebilecek en değerli 6 yeni özelliği öncelik sırasıyla yaz. Her biri tek satır: özellik adı — neden değerli — zorluk (kolay/orta/zor). Sunucu gerektiren ya da zaten var olan şeyleri önerme.
 
-1. Bu uygulamaya eklenebilecek en değerli 8 özelliği öncelik sırasıyla yaz. Her biri için: bir cümle ne olduğu, bir cümle neden değerli, zorluk (kolay/orta/zor).
-2. Yinelenen video tespitini nasıl iyileştirirsin? Özellikle iki zor durum için pratik (cihazda çalışacak, sunucusuz) yöntem öner: (a) Türk sitelerinde video süresi yok, (b) aynı videonun başlığı başka dile çevrilmiş ya da tamamen yeniden yazılmış.
-3. Gizlilik ve güvenlik açısından eksik gördüğün en önemli 3 şey nedir (ör. uygulama kilidi, geçmişin saklanması, ağ izleri)?
-4. Mevcut tasarımda gördüğün en riskli teknik nokta nedir ve nasıl sağlamlaştırırsın?
+---
+
+Soru: Yinelenen video tespitini cihazda (sunucusuz) nasıl iyileştirirsin? İki zor durum var: (a) bazı sitelerde video süresi yok, (b) aynı videonun başlığı başka dile çevrilmiş ya da yeniden yazılmış. En uygulanabilir 4 yöntemi, her birinin zayıf yanıyla birlikte yaz.
+
+---
+
+Soru: Gizlilik ve güvenlik açısından bu uygulamada eksik olan en önemli 4 şey nedir? Her biri tek satır ve somut olsun (ör. uygulama kilidi, geçmişin saklanması, ağ izleri).
