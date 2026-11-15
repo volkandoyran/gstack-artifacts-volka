@@ -1,0 +1,221 @@
+name: Vitrin iOS
+
+# vitrin/ klasöründeki iOS uygulamasını test eder, Xcode ile derler, simülatörde çalıştırır
+# ve yan yüklenebilir IPA üretir. Çıktılar: Actions → ilgili çalışma → Artifacts.
+on:
+  push:
+    branches: [ "claude/**" ]
+    paths: [ "vitrin/**", ".github/workflows/vitrin-ios.yml" ]
+  workflow_dispatch:
+
+concurrency:
+  group: vitrin-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cekirdek:
+    name: Çekirdek testleri (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: vitrin
+    steps:
+      - uses: actions/checkout@v5
+      - name: Birim testleri
+        run: swift test
+
+  canli:
+    name: Canlı kaynak denemesi
+    # Sitelere gerçek istek atar (arama + ilk sonucun oynatma bilgisi). Bir site o an
+    # erişilemez olabilir; bu yüzden derlemeyi engellemez. Sonuç tablosu iş özetindedir.
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    timeout-minutes: 15
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: vitrin
+    steps:
+      - uses: actions/checkout@v5
+      - name: Kaynakları dene
+        env:
+          VITRIN_LIVE: "1"
+        run: swift test --filter LiveProviderTests
+
+  web-uyumluluk:
+    name: Web sürümü için uyumluluk ölçümü
+    # Profil (Web Clip) ile kurulan web sürümü tarayıcıda çalışır; tarayıcı bir siteden veri
+    # okuyabilmek için o sitenin CORS izni vermesini ister. Bu iş hangi kaynakların izin verdiğini ölçer.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - name: CORS ve çerçeve izinlerini ölç
+        run: |
+          python3 - <<'PY'
+          import os, urllib.request, urllib.error, json
+          ORIGIN = 'https://ornek.github.io'
+          UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'
+          hedefler = [
+            ('Eporner API', 'GET', 'https://www.eporner.com/api/v2/video/search/?query=massage&per_page=1&format=json', None),
+            ('Pornhub API', 'GET', 'https://www.pornhub.com/webmasters/search?search=massage&page=1', None),
+            ('RedTube API', 'GET', 'https://api.redtube.com/?data=redtube.Videos.searchVideos&output=json&search=massage&page=1', None),
+            ('hanime arama', 'POST', 'https://search.htv-services.com/', {'search_text': 'a', 'tags': [], 'tags_mode': 'AND', 'brands': [], 'blacklist': [], 'order_by': 'created_at_unix', 'ordering': 'desc', 'page': 0}),
+            ('Doeda One (WP API)', 'GET', 'https://www.doeda.one/wp-json/wp/v2/posts?per_page=1&_fields=id,link,title', None),
+            ('Doeda (WP API, http)', 'GET', 'http://www.doeda.com/wp-json/wp/v2/posts?per_page=1&_fields=id,link,title', None),
+            ('XVideos arama sayfası', 'GET', 'https://www.xvideos.com/?k=massage', None),
+            ('XNXX arama sayfası', 'GET', 'https://www.xnxx.com/search/massage', None),
+            ('Eporner gömülü oynatıcı', 'GET', 'https://www.eporner.com/embed/27zf5ImSu7z/', None),
+            ('Pornhub gömülü oynatıcı', 'GET', 'https://www.pornhub.com/embed/6aefe3bd89f78', None),
+            ('RedTube gömülü oynatıcı', 'GET', 'https://embed.redtube.com/?id=309411291', None),
+            ('XVideos gömülü oynatıcı', 'GET', 'https://www.xvideos.com/embedframe/83000781', None),
+            ('XNXX gömülü oynatıcı', 'GET', 'https://www.xnxx.com/embedframe/86309561', None),
+          ]
+          satirlar = ['| Hedef | Durum | CORS izni (Access-Control-Allow-Origin) | Çerçeve kısıtı | Tür |', '|---|---|---|---|---|']
+          for ad, yontem, url, govde in hedefler:
+              veri = json.dumps(govde).encode() if govde is not None else None
+              bas = {'Origin': ORIGIN, 'User-Agent': UA, 'Accept': '*/*'}
+              if veri: bas['Content-Type'] = 'application/json'
+              req = urllib.request.Request(url, data=veri, headers=bas, method=yontem)
+              try:
+                  try:
+                      r = urllib.request.urlopen(req, timeout=25)
+                  except urllib.error.HTTPError as e:
+                      r = e
+                  h = r.headers
+                  cerceve = h.get('X-Frame-Options') or ''
+                  csp = h.get('Content-Security-Policy') or ''
+                  if 'frame-ancestors' in csp:
+                      cerceve += ' csp:' + csp.split('frame-ancestors', 1)[1].split(';')[0].strip()[:60]
+                  satirlar.append(f"| {ad} | {r.status if hasattr(r, 'status') else r.code} | {h.get('Access-Control-Allow-Origin') or '—'} | {cerceve or '—'} | {(h.get('Content-Type') or '').split(';')[0]} |")
+              except Exception as e:
+                  satirlar.append(f'| {ad} | HATA: {str(e)[:80]} | | | |')
+          tablo = '## Web sürümü uyumluluğu\n\n' + '\n'.join(satirlar) + '\n'
+          print(tablo)
+          open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8').write(tablo)
+          PY
+
+  ios:
+    name: Xcode derlemesi ve simülatör denemesi
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: vitrin
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Xcode sürümü
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Xcode projesini üret (XcodeGen)
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Simülatör için derle
+        run: |
+          set -o pipefail
+          xcodebuild -quiet -project Vitrin.xcodeproj -scheme Vitrin -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/sim ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build-sim.log
+
+      - name: Derleme hatalarının özeti
+        if: failure()
+        run: |
+          echo "===== HATALAR ====="
+          grep -E "error:" build-sim.log | sort -u | head -100 || true
+
+      - name: Simülatörde çalıştır
+        run: |
+          set -euo pipefail
+          APP=build/sim/Build/Products/Debug-iphonesimulator/Vitrin.app
+          CIKTI="$GITHUB_WORKSPACE/ciktilar"
+          mkdir -p "$CIKTI"
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)["devices"]
+          c = [(k, x) for k, v in d.items() if "iOS" in k for x in v if x["name"].startswith("iPhone")]
+          c.sort(key=lambda t: [int(n) for n in t[0].split("iOS-")[-1].split("-")])
+          print(c[-1][1]["udid"])')
+          echo "Simülatör: $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+
+          echo "== 1) İlk açılış: 18+ onay ekranı"
+          xcrun simctl launch "$UDID" com.example.vitrin
+          sleep 12
+          pgrep -f "Vitrin.app/Vitrin" >/dev/null || { echo "::error::Uygulama açılışta kapandı"; exit 1; }
+          xcrun simctl io "$UDID" screenshot "$CIKTI/1-yas-onayi.png"
+          xcrun simctl terminate "$UDID" com.example.vitrin
+
+          echo "== 2) Ayarlar sekmesi"
+          xcrun simctl launch "$UDID" com.example.vitrin -ageConfirmed YES -selectedTab 1
+          sleep 10
+          pgrep -f "Vitrin.app/Vitrin" >/dev/null || { echo "::error::Uygulama Ayarlar ekranında kapandı"; exit 1; }
+          xcrun simctl io "$UDID" screenshot "$CIKTI/2-ayarlar.png"
+          xcrun simctl terminate "$UDID" com.example.vitrin
+
+          echo "== 3) Keşfet sekmesi: gerçek arama (ekran görüntüsü alınmaz, yalnızca sayılar)"
+          xcrun simctl launch --console-pty "$UDID" com.example.vitrin \
+            -ageConfirmed YES -selectedTab 0 -diagnostics > "$CIKTI/uygulama-gunlugu.txt" 2>&1 &
+          sleep 45
+          if ! pgrep -f "Vitrin.app/Vitrin" >/dev/null; then
+            echo "::error::Uygulama Keşfet ekranında kapandı"
+            tail -50 "$CIKTI/uygulama-gunlugu.txt" || true
+            exit 1
+          fi
+          grep "VITRIN-DIAG" "$CIKTI/uygulama-gunlugu.txt" || echo "::warning::Tanı satırı bulunamadı (sonuç gelmemiş olabilir)"
+          xcrun simctl terminate "$UDID" com.example.vitrin || true
+          xcrun simctl shutdown "$UDID" || true
+          if ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i "^Vitrin"; then
+            echo "::error::Çökme raporu bulundu"; exit 1
+          fi
+          {
+            echo "## Simülatör denemesi"
+            echo "- 18+ onay ekranı açıldı, Ayarlar ekranı açıldı, Keşfet ekranı 45 sn çökmeden çalıştı"
+            echo '```'
+            grep "VITRIN-DIAG" "$CIKTI/uygulama-gunlugu.txt" || echo "(tanı satırı yok)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cihaz için imzasız derle (iphoneos)
+        run: |
+          set -o pipefail
+          xcodebuild -quiet -project Vitrin.xcodeproj -scheme Vitrin -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/device CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build-device.log
+
+      - name: Paketle (IPA)
+        run: |
+          set -euo pipefail
+          APP=build/device/Build/Products/Release-iphoneos/Vitrin.app
+          # Sideloadly / AltStore / SideStore uygulamayı kendi Apple ID'nle yeniden imzalar.
+          codesign --force --sign - --timestamp=none "$APP"
+          codesign --verify --deep --strict "$APP"
+          CIKTI="$GITHUB_WORKSPACE/ciktilar"
+          mkdir -p "$CIKTI/Payload"
+          cp -R "$APP" "$CIKTI/Payload/"
+          (cd "$CIKTI" && zip -qry Vitrin.ipa Payload && rm -rf Payload)
+          (cd build/sim/Build/Products/Debug-iphonesimulator && zip -qry "$CIKTI/Vitrin-simulator.app.zip" Vitrin.app)
+          ls -la "$CIKTI"
+
+      - name: Çıktıları yükle
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: vitrin-${{ github.run_number }}
+          path: |
+            ciktilar/
+            vitrin/build-sim.log
+            vitrin/build-device.log
+          if-no-files-found: warn
