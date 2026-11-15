@@ -22,6 +22,25 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: GitHub Models erişim tanılaması
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          govde='{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"Sadece tamam yaz."}],"max_tokens":20}'
+          govde2='{"model":"gpt-4o-mini","messages":[{"role":"user","content":"Sadece tamam yaz."}],"max_tokens":20}'
+          dene() { echo "== $1"; shift; curl -sS -m 40 -o yanit.txt -w "HTTP %{http_code} · %{content_type} · %{size_download} bayt\n" "$@" || true; head -c 400 yanit.txt; echo; }
+          dene "models.github.ai (vnd.github+json)" -X POST https://models.github.ai/inference/chat/completions \
+            -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/json" -d "$govde"
+          dene "models.github.ai (application/json)" -X POST https://models.github.ai/inference/chat/completions \
+            -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/json" -H "Content-Type: application/json" -d "$govde"
+          dene "models.github.ai / depo sahibi yolu" -X POST "https://models.github.ai/orgs/${GITHUB_REPOSITORY_OWNER}/inference/chat/completions" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" -d "$govde"
+          dene "models.inference.ai.azure.com" -X POST https://models.inference.ai.azure.com/chat/completions \
+            -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$govde2"
+          dene "katalog" https://models.github.ai/catalog/models -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json"
+
       - name: Modellere sor
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
