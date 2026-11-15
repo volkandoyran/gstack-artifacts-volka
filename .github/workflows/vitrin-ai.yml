@@ -44,14 +44,28 @@ jobs:
           # 1) GitHub Models: GPT ve farklı yayıncılardan modeller; bulunmayan model atlanır.
           gh = {'Authorization': f'Bearer {tok}', 'Accept': 'application/vnd.github+json',
                 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json'}
+          def github_models(model, metin, azami=1800):
+              ham = istek('https://models.github.ai/inference/chat/completions',
+                  {'model': model, 'messages': [{'role': 'user', 'content': metin}], 'max_tokens': azami}, gh)
+              try:
+                  return json.loads(ham)['choices'][0]['message']['content']
+              except Exception as e:
+                  raise RuntimeError(f'beklenmeyen yanıt ({len(ham)} bayt): {ham[:300]!r}') from e
+
+          # Erişim denetimi: içerikten bağımsız kısa bir soru (hata ayıklamak için)
+          try:
+              print('ERISIM DENETIMI:', github_models('openai/gpt-4o-mini', 'Sadece "tamam" yaz.', 20))
+          except urllib.error.HTTPError as e:
+              print('ERISIM DENETIMI HATA: HTTP', e.code, e.read()[:400])
+          except Exception as e:
+              print('ERISIM DENETIMI HATA:', e)
+
           for model in ['openai/gpt-4.1', 'openai/gpt-4o', 'meta/Llama-4-Maverick-17B-128E-Instruct-FP8',
                         'mistral-ai/mistral-medium-2505', 'deepseek/DeepSeek-V3-0324', 'xai/grok-3-mini']:
               try:
-                  yanit = json.loads(istek('https://models.github.ai/inference/chat/completions',
-                      {'model': model, 'messages': [{'role': 'user', 'content': istem}], 'max_tokens': 1800}, gh))
-                  sonuc.append((f'GitHub Models · {model}', yanit['choices'][0]['message']['content']))
+                  sonuc.append((f'GitHub Models · {model}', github_models(model, istem)))
               except urllib.error.HTTPError as e:
-                  hatalar.append(f'{model}: HTTP {e.code} {e.read()[:200]!r}')
+                  hatalar.append(f'{model}: HTTP {e.code} {e.read()[:300]!r}')
               except Exception as e:
                   hatalar.append(f'{model}: {e}')
 
