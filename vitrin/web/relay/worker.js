@@ -5,6 +5,7 @@
 // Aracı neleri GEÇİRMEZ: videolar ve oynatıcılar (bunlar telefondan doğrudan yüklenir),
 // izin listesinde olmayan alan adları, GET/POST dışındaki istekler. Hiçbir şey saklanmaz, kayıt tutulmaz.
 import { buildProfile } from './profile.js';
+import { buildSource } from './ipa.js';
 
 const BUILT_IN_HOSTS = [
   'www.pornhub.com', 'api.redtube.com', 'www.xvideos.com', 'www.xnxx.com', 'www.eporner.com',
@@ -84,9 +85,22 @@ export default {
       return new Response(profile, { headers: { 'Content-Type': 'application/x-apple-aspen-config', 'Cache-Control': 'no-store', ...SECURITY } });
     }
 
+    // SideStore / AltStore kaynağı: adresler bu sitenin kendi adresiyle üretilir.
+    if (url.pathname === '/ipa/kaynak.json') {
+      const res = await env.ASSETS.fetch(new Request(new URL('/ipa/surum.json', url)));
+      if (!res.ok) return json({ error: 'Henüz yayınlanmış bir IPA yok.' }, 404);
+      return json(buildSource(url.origin, await res.json()), 200, { 'Cache-Control': 'no-cache' });
+    }
+
     const res = await env.ASSETS.fetch(request);
     const out = new Response(res.body, res);
     for (const [k, v] of Object.entries(SECURITY)) out.headers.set(k, v);
+    if (url.pathname.endsWith('.ipa') && res.ok) {
+      out.headers.set('Content-Type', 'application/octet-stream');
+      out.headers.set('Content-Disposition', 'attachment; filename="Vitrin.ipa"');
+      out.headers.set('Cache-Control', 'no-cache');
+    }
+    if (url.pathname === '/ipa/surum.json') out.headers.set('Cache-Control', 'no-cache');
     return out;
   },
 };

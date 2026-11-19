@@ -89,3 +89,31 @@ test('profil: adres ve ad güvenli biçimde yazılır', () => {
   assert.ok(xml.includes('<string>A &amp; B</string>'));
   assert.ok(xml.startsWith('<?xml version="1.0"'));
 });
+
+test('IPA dağıtımı: SideStore/AltStore kaynağı ve indirme başlıkları', async () => {
+  const surum = { name: 'Vitrin', bundleIdentifier: 'com.example.vitrin', version: '1.2', buildVersion: '3',
+    minOSVersion: '17.0', size: 1234567, sha256: 'ab', date: '2026-11-19T10:00:00Z', note: '' };
+  const assets = (has) => ({ ASSETS: { fetch: async (r) => {
+    const p = new URL(r.url).pathname;
+    if (p === '/ipa/surum.json' && has) return new Response(JSON.stringify(surum), { headers: { 'Content-Type': 'application/json' } });
+    if (p === '/ipa/Vitrin.ipa' && has) return new Response(new Uint8Array([80, 75]), { headers: { 'Content-Type': 'text/plain' } });
+    return new Response('yok', { status: 404 });
+  } } });
+
+  const src = await (await worker.fetch(req('/ipa/kaynak.json'), assets(true))).json();
+  assert.equal(src.identifier, 'app.vitrin.kaynak');
+  const app = src.apps[0];
+  assert.equal(app.bundleIdentifier, 'com.example.vitrin');
+  assert.equal(app.versions[0].downloadURL, `${APP}/ipa/Vitrin.ipa`);
+  assert.equal(app.versions[0].version, '1.2');
+  assert.equal(app.versions[0].size, 1234567);
+  assert.equal(app.versions[0].minOSVersion, '17.0');
+  assert.equal(app.downloadURL, `${APP}/ipa/Vitrin.ipa`, 'eski istemciler için tek sürüm alanı');
+  assert.equal(src.iconURL, `${APP}/icon-512.png`);
+
+  const ipa = await worker.fetch(req('/ipa/Vitrin.ipa'), assets(true));
+  assert.equal(ipa.headers.get('Content-Type'), 'application/octet-stream');
+  assert.match(ipa.headers.get('Content-Disposition'), /attachment; filename="Vitrin.ipa"/);
+
+  assert.equal((await worker.fetch(req('/ipa/kaynak.json'), assets(false))).status, 404, 'IPA yokken kaynak 404');
+});

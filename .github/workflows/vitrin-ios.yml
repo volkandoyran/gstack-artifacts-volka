@@ -221,3 +221,78 @@ jobs:
             vitrin/build-sim.log
             vitrin/build-device.log
           if-no-files-found: warn
+
+  ipa-yayinla:
+    name: IPA'yı siteye koy ve yayınla
+    # Derlenen IPA'yı vitrin/web/site/ipa/ klasörüne işler (GITHUB_TOKEN ile yapılan gönderim yeni
+    # iş akışı başlatmaz, döngü olmaz). Cloudflare anahtarları eklenmişse siteyi de yayınlar;
+    # böylece SideStore/AltStore kaynağındaki uygulama kendiliğinden güncellenir.
+    needs: ios
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: vitrin-${{ github.run_number }}
+          path: indirilen
+
+      - name: IPA'yı siteye koy
+        id: ipa
+        env:
+          NOT: ${{ github.event.head_commit.message }}
+        run: |
+          set -uo pipefail
+          IPA=$(find indirilen -name Vitrin.ipa | head -1)
+          test -n "$IPA" || { echo "::error::Vitrin.ipa bulunamadı"; exit 1; }
+          python3 -I vitrin/web/tools/ipa-surum.py "$IPA" vitrin/web/site/ipa "$(printf '%s' "$NOT" | head -1 | cut -c1-200)"
+          kod=$?
+          if [ $kod -eq 3 ]; then echo "degisti=hayir" >> "$GITHUB_OUTPUT"; exit 0; fi
+          [ $kod -eq 0 ] || exit $kod
+          echo "degisti=evet" >> "$GITHUB_OUTPUT"
+
+      - name: Depoya işle
+        if: steps.ipa.outputs.degisti == 'evet'
+        env:
+          DAL: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vitrin/web/site/ipa/Vitrin.ipa vitrin/web/site/ipa/surum.json
+          SURUM=$(python3 -c "import json;d=json.load(open('vitrin/web/site/ipa/surum.json'));print(d['version']+' ('+d['buildVersion']+')')")
+          git commit -m "Vitrin IPA $SURUM [ios-atla]"
+          for i in 1 2 3; do
+            git pull --rebase origin "$DAL" && git push origin "HEAD:$DAL" && break
+            sleep 5
+          done
+
+      - uses: actions/setup-node@v5
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        with:
+          node-version: 22
+
+      - name: Cloudflare'e yayınla
+        working-directory: vitrin/web
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            {
+              echo "### IPA depoya işlendi, site yayınlanmadı"
+              echo "CLOUDFLARE_API_TOKEN ve CLOUDFLARE_ACCOUNT_ID eklenmemiş. Adımlar: vitrin/web/README.md"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set -o pipefail
+          npx --yes wrangler@4 deploy 2>&1 | tee yayin.log
+          ADRES=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' yayin.log | head -1 || true)
+          {
+            echo "### IPA yayınlandı"
+            echo "Kurulum sayfası: ${ADRES:-(günlükte)}/ipa/"
+            echo "SideStore/AltStore kaynağı: ${ADRES:-(günlükte)}/ipa/kaynak.json"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -102,14 +102,28 @@ open Vitrin.xcodeproj
 Signing & Capabilities'te kendi Apple ID'ni seç, `PRODUCT_BUNDLE_IDENTIFIER`'ı benzersiz yap, iPhone'a çalıştır.
 (Ücretsiz Apple ID ile imza 7 gün geçerlidir.)
 
-### Mac yoksa
+### İnternetten kurulum (IPA)
+Her iOS derlemesinden sonra IPA kendiliğinden sitenin `ipa/` adresine konur:
+
+- **Kurulum sayfası:** `https://vitrin.vitrin-web.workers.dev/ipa/` — iPhone'da Safari ile aç.
+- **SideStore/AltStore kaynağı:** `https://vitrin.vitrin-web.workers.dev/ipa/kaynak.json` — bir kez eklenir,
+  sonraki sürümler uygulamanın içinden güncellenir.
+- **Doğrudan dosya:** `https://vitrin.vitrin-web.workers.dev/ipa/Vitrin.ipa` — Sideloadly ya da telefondaki bir imzalama uygulaması için.
+
+IPA imzasızdır; Safari'den doğrudan kurulmaz. SideStore/AltStore/Sideloadly onu kendi Apple ID'nle imzalar
+(ücretsiz Apple ID ile 7 gün; SideStore internetten yeniler). SideStore'un ilk kurulumu için bir kez bilgisayar gerekir.
+
+Yeni sürümün siteye kendiliğinden yayınlanması için depoya `CLOUDFLARE_API_TOKEN` ve `CLOUDFLARE_ACCOUNT_ID`
+secret'larının eklenmiş olması gerekir (adımlar `web/README.md`). Eklenmemişse IPA yine depoya işlenir,
+ama site elle yayınlanana kadar eski sürümü gösterir.
+
+### Derleme
 Depoya her gönderimde `.github/workflows/vitrin-ios.yml` GitHub'ın macOS makinesinde Xcode ile derler, uygulamayı
-simülatörde açıp dener ve **Vitrin.ipa** üretir: *Actions → Vitrin iOS → son yeşil çalışma → Artifacts → vitrin-N*.
-İçindeki `Vitrin.ipa`'yı **Sideloadly** (Windows/Mac), **AltStore** ya da **SideStore** ile kendi Apple ID'nle yükle.
-Aynı pakette simülatör ekran görüntüleri (18+ onayı, Ayarlar) ve uygulama günlüğü de bulunur.
+simülatörde açıp dener ve **Vitrin.ipa** üretir (ayrıca *Actions → Vitrin iOS → Artifacts*).
 
 Not: depo özel olduğu için macOS derlemeleri GitHub'ın ücretsiz dakika kotasından 10 kat hızlı düşer
-(bir çalışma ≈ 5 dakika ≈ 50 kota dakikası; ücretsiz planda ayda 2000).
+(bir çalışma ≈ 7 dakika ≈ 70 kota dakikası; ücretsiz planda ayda 2000). Yalnızca test/yazı değişikliklerinde
+commit mesajına `[ios-atla]` eklenirse macOS derlemesi atlanır.
 
 ## Geliştirme
 

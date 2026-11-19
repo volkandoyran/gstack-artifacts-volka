@@ -327,6 +327,10 @@ function renderSettings() {
         h('input', { name: 'relay', value: st.relayURL, placeholder: 'https://…workers.dev/r (isteğe bağlı)', autocomplete: 'off', autocapitalize: 'none', inputmode: 'url' }),
         h('button', { class: 'btn', type: 'submit' }, 'Kaydet ve dene')),
 
+      h('h3', {}, 'Yerel uygulama (IPA)'),
+      h('p', { class: 'note' }, 'Uygulamanın kendi oynatıcısı ve kalite menüsü olan yerel sürümü SideStore/AltStore ile internetten kurulabilir.'),
+      h('a', { class: 'btn', href: 'ipa/' }, 'IPA kurulum sayfası'),
+
       h('h3', {}, 'Ağ, DNS ve VPN'),
       h('p', { class: 'note' }, 'Uygulama telefonunun DNS ve VPN ayarlarını olduğu gibi kullanır, onlara dokunmaz. Küçük resimler ve videolar doğrudan telefonundan yüklenir; bir site engelliyse VPN/DNS açıkken tekrar dene.'),
       h('h3', {}, 'Güvenlik'),
