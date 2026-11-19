@@ -1,0 +1,8 @@
+.build/
+build/
+Payload/
+*.xcodeproj
+*.ipa
+Vitrin/Info.plist
+.DS_Store
+!web/site/ipa/Vitrin.ipa

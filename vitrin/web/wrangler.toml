@@ -1,0 +1,16 @@
+# Cloudflare Worker ayarı: site/ klasörünü sunar, /r adresinde aracı (relay) çalıştırır.
+# Yayınlama: `npx wrangler deploy` (ya da .github/workflows/vitrin-web.yml bunu senin yerine yapar).
+name = "vitrin"
+main = "relay/worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+[assets]
+directory = "./site"
+binding = "ASSETS"
+run_worker_first = true
+
+# İsteğe bağlı değişkenler (Cloudflare panelinden de eklenebilir):
+# [vars]
+# EXTRA_HOSTS = "ornek.com,www.ornek.com"        # kendi eklediğin WordPress sitelerinin alan adları
+# ALLOWED_ORIGINS = "https://kullanici.github.io" # uygulama başka bir adreste duruyorsa

@@ -1,0 +1,99 @@
+name: Vitrin IPA yayını
+
+# Derlenen IPA'yı vitrin/web/site/ipa/ klasörüne işler (GITHUB_TOKEN ile yapılan gönderim yeni
+# iş akışı başlatmaz, döngü olmaz) ve Cloudflare anahtarları eklenmişse siteyi yayınlar.
+# - "Vitrin iOS" iş akışı her derlemeden sonra bunu çağırır (run_id = o çalışma).
+# - Elle (Run workflow) ya da bu dosya değişince: bu daldaki en son IPA kullanılır; macOS'ta yeniden derleme yapılmaz.
+on:
+  workflow_call:
+    inputs:
+      run_id:
+        type: string
+        required: false
+  workflow_dispatch:
+  push:
+    branches: [ "claude/**" ]
+    paths: [ ".github/workflows/vitrin-ipa.yml" ]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  yayinla:
+    name: IPA'yı siteye koy ve yayınla
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_TOKEN: ${{ github.token }}
+      DAL: ${{ github.ref_name }}
+      CALISMA: ${{ inputs.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: IPA'yı indir
+        run: |
+          set -euo pipefail
+          if [ -z "$CALISMA" ]; then
+            # Bu daldaki en yeni, süresi dolmamış iOS derleme çıktısı (vitrin-<numara>)
+            CALISMA=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq \
+              "[.artifacts[] | select(.expired == false and (.name | test(\"^vitrin-[0-9]+$\")) and .workflow_run.head_branch == \"$DAL\")] | sort_by(.created_at) | last | .workflow_run.id")
+            test -n "$CALISMA" && [ "$CALISMA" != "null" ] || { echo "::error::Bu dalda IPA içeren derleme bulunamadı"; exit 1; }
+          fi
+          echo "Kullanılan derleme: $CALISMA"
+          AD=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CALISMA/artifacts" --jq '[.artifacts[] | select(.name | test("^vitrin-[0-9]+$"))][0].name')
+          gh run download "$CALISMA" -R "$GITHUB_REPOSITORY" -n "$AD" -D indirilen
+          find indirilen -name Vitrin.ipa | head -1 | tee ipa-yolu.txt
+          test -s ipa-yolu.txt || { echo "::error::Vitrin.ipa bulunamadı"; exit 1; }
+
+      - name: IPA'yı siteye koy
+        id: ipa
+        run: |
+          set -uo pipefail
+          NOT=$(git log -1 --format=%s | cut -c1-200)
+          python3 -I vitrin/web/tools/ipa-surum.py "$(cat ipa-yolu.txt)" vitrin/web/site/ipa "$NOT"
+          kod=$?
+          if [ $kod -eq 3 ]; then echo "degisti=hayir" >> "$GITHUB_OUTPUT"; exit 0; fi
+          [ $kod -eq 0 ] || exit $kod
+          echo "degisti=evet" >> "$GITHUB_OUTPUT"
+
+      - name: Depoya işle
+        if: steps.ipa.outputs.degisti == 'evet'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f vitrin/web/site/ipa/Vitrin.ipa vitrin/web/site/ipa/surum.json
+          SURUM=$(python3 -c "import json;d=json.load(open('vitrin/web/site/ipa/surum.json'));print(d['version']+' ('+d['buildVersion']+')')")
+          git commit -m "Vitrin IPA $SURUM [ios-atla]"
+          for i in 1 2 3; do
+            git pull --rebase origin "$DAL" && git push origin "HEAD:$DAL" && break
+            sleep 5
+          done
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Cloudflare'e yayınla
+        working-directory: vitrin/web
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            {
+              echo "### IPA depoya işlendi, site yayınlanmadı"
+              echo "CLOUDFLARE_API_TOKEN ve CLOUDFLARE_ACCOUNT_ID eklenmemiş. Adımlar: vitrin/web/README.md"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set -o pipefail
+          npx --yes wrangler@4 deploy 2>&1 | tee yayin.log
+          ADRES=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' yayin.log | head -1 || true)
+          {
+            echo "### IPA yayınlandı"
+            echo "Kurulum sayfası: ${ADRES:-(günlükte)}/ipa/"
+            echo "SideStore/AltStore kaynağı: ${ADRES:-(günlükte)}/ipa/kaynak.json"
+          } >> "$GITHUB_STEP_SUMMARY"

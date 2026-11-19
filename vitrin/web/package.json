@@ -1,0 +1,11 @@
+{
+  "name": "vitrin-web",
+  "private": true,
+  "type": "module",
+  "description": "Vitrin'in profil (Web Clip) ile kurulan web sürümü ve aracı (Cloudflare Worker).",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "smoke": "node tests/smoke.mjs",
+    "profil": "node tools/profil-olustur.mjs"
+  }
+}

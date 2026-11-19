@@ -1,0 +1,121 @@
+name: Vitrin — yapay zekâ danışması
+
+# Ücretsiz yapay zekâ servislerine (Pollinations üzerinden GPT, anahtar eklenmişse Gemini,
+# erişilebiliyorsa GitHub Models) .github/ai/vitrin-istem.md dosyasındaki soruları sorar;
+# yanıtları iş özetine ve indirilebilir çıktıya yazar. Gönderilen tek veri o dosyadır.
+# Gemini için: depo → Settings → Secrets and variables → Actions → GEMINI_API_KEY
+# (anahtar aistudio.google.com'dan ücretsiz alınır).
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "claude/**" ]
+    paths: [ ".github/ai/vitrin-istem.md", ".github/workflows/vitrin-ai.yml" ]
+
+permissions:
+  contents: read
+  models: read
+
+jobs:
+  sor:
+    name: Modellere sor
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Modellere sor
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json, os, random, time, urllib.request, urllib.error
+          ham = open('.github/ai/vitrin-istem.md', encoding='utf-8').read()
+          # Dosya biçimi: önce ortak bağlam, sonra "---" satırlarıyla ayrılmış sorular.
+          # Her soru ayrı sorulur ki ücretsiz servisler yanıtı yarıda kesmesin.
+          parcalar = [p.strip() for p in ham.split('\n---\n') if p.strip()]
+          baglam, sorular = parcalar[0], parcalar[1:] or ['']
+          tok = os.environ['GITHUB_TOKEN']
+          gemini_key = os.environ.get('GEMINI_API_KEY', '')
+
+          def istek(url, govde, basliklar, zaman=150):
+              req = urllib.request.Request(url, data=json.dumps(govde).encode(), headers=basliklar, method='POST')
+              with urllib.request.urlopen(req, timeout=zaman) as r:
+                  return r.read().decode('utf-8', 'replace')
+
+          def sohbet(ham):
+              try:
+                  return json.loads(ham)['choices'][0]['message']['content']
+              except Exception as e:
+                  raise RuntimeError(f'beklenmeyen yanıt ({len(ham)} bayt): {ham[:200]!r}') from e
+
+          def pollinations(metin):
+              return sohbet(istek('https://text.pollinations.ai/openai',
+                  {'model': 'openai', 'seed': random.randint(1, 10**9), 'messages': [{'role': 'user', 'content': metin}]},
+                  {'Content-Type': 'application/json'}))
+
+          def gemini(metin):
+              son = None
+              for model in ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash']:
+                  try:
+                      y = json.loads(istek(f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+                          {'contents': [{'role': 'user', 'parts': [{'text': metin}]}]},
+                          {'x-goog-api-key': gemini_key, 'Content-Type': 'application/json'}))
+                      return model, ''.join(p.get('text', '') for p in y['candidates'][0]['content']['parts'])
+                  except Exception as e:
+                      son = e
+              raise son
+
+          def github_models(metin):
+              return sohbet(istek('https://models.github.ai/inference/chat/completions',
+                  {'model': 'openai/gpt-4.1', 'messages': [{'role': 'user', 'content': metin}], 'max_tokens': 1500},
+                  {'Authorization': f'Bearer {tok}', 'Accept': 'application/vnd.github+json',
+                   'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json'}, 60))
+
+          def hata(e):
+              if isinstance(e, urllib.error.HTTPError):
+                  return f'HTTP {e.code} {e.read()[:200]!r}'
+              return str(e)[:300]
+
+          rapor, hatalar = ['# Vitrin — yapay zekâ önerileri'], []
+          for i, soru in enumerate(sorular, 1):
+              metin = f'{baglam}\n\n{soru}'.strip()
+              rapor.append(f'\n## Soru {i}\n\n> ' + soru.replace('\n', '\n> '))
+              # Pollinations ücretsiz kullanımda IP başına 45 saniyede bir yanıt veriyor; bir kez yeniden dene.
+              for deneme in (1, 2):
+                  try:
+                      rapor.append(f'\n### GPT (Pollinations · openai)\n\n{pollinations(metin)}')
+                      break
+                  except Exception as e:
+                      if deneme == 2:
+                          hatalar.append(f'Soru {i} · Pollinations: {hata(e)}')
+                      else:
+                          time.sleep(50)
+              if gemini_key:
+                  try:
+                      model, yanit = gemini(metin)
+                      rapor.append(f'\n### Gemini ({model})\n\n{yanit}')
+                  except Exception as e:
+                      hatalar.append(f'Soru {i} · Gemini: {hata(e)}')
+              if i == 1:
+                  try:
+                      rapor.append(f'\n### GPT-4.1 (GitHub Models)\n\n{github_models(metin)}')
+                  except Exception as e:
+                      hatalar.append(f'GitHub Models: {hata(e)}')
+              time.sleep(50)
+          if not gemini_key:
+              hatalar.append('Gemini: GEMINI_API_KEY eklenmemiş, atlandı')
+          rapor.append('\n## Yanıt vermeyenler\n\n' + ('\n'.join(f'- {h}' for h in hatalar) or '- yok') + '\n')
+          metin = '\n'.join(rapor)
+          os.makedirs('cikti', exist_ok=True)
+          open('cikti/vitrin-oneriler.md', 'w', encoding='utf-8').write(metin)
+          open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8').write(metin)
+          print('=====RAPOR-BASI=====')
+          print(metin)
+          print('=====RAPOR-SONU=====')
+          PY
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: vitrin-ai-oneriler-${{ github.run_number }}
+          path: cikti/vitrin-oneriler.md
