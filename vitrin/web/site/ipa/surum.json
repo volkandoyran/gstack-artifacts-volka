@@ -1,0 +1,11 @@
+{
+  "name": "Vitrin",
+  "bundleIdentifier": "com.example.vitrin",
+  "version": "1.2",
+  "buildVersion": "3",
+  "minOSVersion": "17.0",
+  "size": 500359,
+  "sha256": "102608f73c58fab552c4c42c097e6cb1d14384fb49ecf3e4088a7dee1c831f60",
+  "date": "2026-11-19T22:36:04Z",
+  "note": "IPA yayını ayrı iş akışına taşındı; .gitignore IPA'yı engellemesin [ios-atla]"
+}
