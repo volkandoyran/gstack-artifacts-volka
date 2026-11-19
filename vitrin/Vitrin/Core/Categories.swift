@@ -5,19 +5,14 @@ struct AppCategory: Identifiable, Hashable, Sendable {
     let title: String    // Türkçe görünen ad
     let term: String     // yabancı sitelerde aranan İngilizce terim
     let termTR: String   // Türk sitelerinde aranan Türkçe terim
-    let kind: ContentKind
 
     func term(for lang: Lang) -> String { lang == .tr ? termTR : term }
 }
 
 enum CategoryCatalog {
     private static func r(_ title: String, _ en: String, _ tr: String? = nil) -> AppCategory {
-        AppCategory(id: "r-\(en)", title: title, term: en, termTR: tr ?? title.lowercased(), kind: .real)
+        AppCategory(id: "r-\(en)", title: title, term: en, termTR: tr ?? title.lowercased())
     }
-    private static func h(_ title: String, _ en: String, _ tr: String? = nil) -> AppCategory {
-        AppCategory(id: "h-\(en)", title: title, term: en, termTR: tr ?? title.lowercased(), kind: .hentai)
-    }
-
     static let real: [AppCategory] = [
         r("Türk", "turkish", "türk"), r("Türkçe altyazılı", "turkish subtitles", "türkçe altyazılı"),
         r("Amatör", "amateur", "amatör"), r("Ev yapımı", "homemade", "ev yapımı"),
@@ -31,15 +26,5 @@ enum CategoryCatalog {
         r("4K", "4k", "full hd"),
     ]
 
-    static let hentai: [AppCategory] = [
-        h("Sansürsüz", "uncensored", "sansürsüz"), h("Vanilla", "vanilla", "vanilla"),
-        h("Romantik", "romance", "romantik"), h("Komedi", "comedy", "komedi"),
-        h("Fantastik", "fantasy", "fantastik"), h("Büyük göğüs", "big boobs", "büyük memeli"),
-        h("Olgun", "milf", "olgun"), h("Hizmetçi", "maid", "hizmetçi"), h("Hemşire", "nurse", "hemşire"),
-        h("Elf", "elf", "elf"), h("Harem", "harem", "harem"), h("Yuri", "yuri", "yuri"),
-        h("Dokunaç", "tentacle", "tentacle"), h("Ahegao", "ahegao", "ahegao"), h("NTR", "ntr", "ntr"),
-        h("3D", "3d", "3d"), h("Canavar kız", "monster girl", "canavar"), h("Bikini", "swimsuit", "bikini"),
-    ]
-
-    static let all: [AppCategory] = real + hentai
+    static let all: [AppCategory] = real
 }

@@ -1,25 +1,6 @@
 import Foundation
 
-// MARK: - İçerik türü / dil
-
-enum ContentKind: String, CaseIterable, Identifiable, Codable, Hashable, Sendable {
-    case real, hentai
-    var id: String { rawValue }
-    var title: String { self == .real ? "Gerçek" : "Hentai" }
-}
-
-enum KindFilter: String, CaseIterable, Identifiable, Sendable {
-    case all, real, hentai
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .all: return "Hepsi"
-        case .real: return "Gerçek"
-        case .hentai: return "Hentai"
-        }
-    }
-    func includes(_ kind: ContentKind) -> Bool { self == .all || rawValue == kind.rawValue }
-}
+// MARK: - Dil
 
 /// Bir kaynağın arama dili. Türk sitelerine Türkçe, diğerlerine İngilizce terim gönderilir.
 enum Lang: String, Codable, Hashable, Sendable, CaseIterable, Identifiable {
@@ -75,7 +56,6 @@ struct Video: Identifiable, Hashable, Sendable, Codable {
     let providerID: String
     let remoteID: String
     var id: String { "\(providerID):\(remoteID)" }
-    let kind: ContentKind
     let title: String
     let thumbnail: URL?
     /// 0 = bilinmiyor
@@ -95,13 +75,12 @@ struct Video: Identifiable, Hashable, Sendable, Codable {
     /// Sağlayıcıya özel ek bilgi (gerekirse)
     let extra: String?
 
-    init(providerID: String, remoteID: String, kind: ContentKind, title: String,
+    init(providerID: String, remoteID: String, title: String,
          thumbnail: URL? = nil, durationSec: Int = 0, views: Int = 0, rating: Double = 0,
          addedAt: Date? = nil, tags: [String] = [], embedURL: URL? = nil, pageURL: URL? = nil,
          maxHeight: Int? = nil, extra: String? = nil) {
         self.providerID = providerID
         self.remoteID = remoteID
-        self.kind = kind
         self.title = title
         self.thumbnail = thumbnail
         self.durationSec = durationSec
@@ -134,7 +113,6 @@ enum PlaybackSource: Sendable {
 struct SearchQuery: Sendable {
     /// Sağlayıcının diline göre hazırlanmış arama terimleri
     var terms: [String]
-    var kind: ContentKind
     var sort: SortOption
     var page: Int   // 1'den başlar
 }

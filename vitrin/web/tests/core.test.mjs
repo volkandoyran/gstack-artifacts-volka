@@ -6,17 +6,17 @@ import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
 import { asciiFold, htmlDecode, secondsFromLoose, secondsFromClock, countFromCompact, stripTags, wordTokens } from '../site/core/text.js';
-import { isBlocked, isAllowed, sanitize } from '../site/core/safety.js';
+import { isBlocked, isAllowed, isAnimated, sanitize } from '../site/core/safety.js';
 import { DuplicateFilter, signature } from '../site/core/dedupe.js';
 import { bilingual, CATEGORIES } from '../site/core/catalog.js';
 import { planJobs, interleave, sortVideos } from '../site/core/planner.js';
-import { eporner, pornhub, redtube, xvideos, xnxx, parseXSearch, parseWordPress, findPlayer, wordpress, customSite, DOEDA, DOEDA_ONE, builtInProviders } from '../site/core/providers.js';
+import { eporner, pornhub, redtube, xvideos, xnxx, parseXSearch, parseXStreams, parseJetSources, parseWordPress, findPlayer, wordpress, customSite, DOEDA, DOEDA_ONE, builtInProviders } from '../site/core/providers.js';
 import { createNet, RelayNeededError, describeError } from '../site/core/net.js';
 import { createStore } from '../site/core/store.js';
 import { createBrowser } from '../site/core/browse.js';
 
 const v = (providerID, remoteID, title, durationSec = 0, extra = {}) =>
-  ({ id: `${providerID}:${remoteID}`, providerID, remoteID, kind: 'real', title, durationSec, views: 0, rating: 0, tags: [], ...extra });
+  ({ id: `${providerID}:${remoteID}`, providerID, remoteID, title, durationSec, views: 0, rating: 0, tags: [], ...extra });
 
 function memoryStorage() {
   const m = new Map();
@@ -42,7 +42,6 @@ test('güvenlik filtresi iki dilde reşit olmayanları eler', () => {
   for (const ok of ['18 yaşındaki genç kadın', '18 years old', 'childhood friend', 'Üniversiteli', '19yo', 'liselotte', 'kidnapped']) {
     assert.ok(!isBlocked(ok), ok);
   }
-  assert.ok(isBlocked('school girl', 'hentai') && !isBlocked('school girl', 'real'));
   assert.ok(!isAllowed(v('x', '1', 'Fine title', 0, { tags: ['blonde', 'liseli'] })));
   assert.deepEqual(sanitize(['blonde', 'loli', 'masaj']), ['blonde', 'masaj']);
 });
@@ -91,41 +90,71 @@ test('çeviri sözlüğü her siteye kendi dilinde terim verir', () => {
   assert.deepEqual(bilingual('ev yapımı brazzers'), { en: ['homemade', 'brazzers'], tr: ['ev yapımı', 'brazzers'] });
 });
 
-test('arama planı: VE/VEYA, dil ve tür ayrımı', () => {
+test('arama planı: VE/VEYA ve dil', () => {
   const cat = (id) => CATEGORIES.find((c) => c.id === id);
   const providers = [eporner, wordpress(DOEDA)];
-  const and = planJobs({ providers, kindFilter: 'real', selected: [cat('r-blonde'), cat('r-massage')], free: bilingual('ofis'), combine: 'all', sort: 'newest', page: 1 });
+  const and = planJobs({ providers, selected: [cat('r-blonde'), cat('r-massage')], free: bilingual('ofis'), combine: 'all', sort: 'newest', page: 1 });
   assert.deepEqual(and.map((j) => j.query.terms), [['blonde', 'massage', 'office'], ['sarışın', 'masaj', 'ofis']]);
-  const or = planJobs({ providers: [eporner], kindFilter: 'all', selected: [cat('r-blonde'), cat('r-massage')], free: { en: [], tr: [] }, combine: 'any', sort: 'relevance', page: 2 });
+  const or = planJobs({ providers: [eporner], selected: [cat('r-blonde'), cat('r-massage')], free: { en: [], tr: [] }, combine: 'any', sort: 'relevance', page: 2 });
   assert.deepEqual(or.map((j) => j.query.terms), [['blonde'], ['massage']]);
-  const mixed = planJobs({ providers, kindFilter: 'all', selected: [cat('r-blonde'), cat('h-elf')], free: { en: [], tr: [] }, combine: 'all', sort: 'relevance', page: 1 });
-  assert.deepEqual(mixed.map((j) => `${j.provider.id}|${j.query.kind}|${j.query.terms}`),
-    ['eporner|real|blonde', 'wp-doeda.com|real|sarışın', 'eporner|hentai|elf', 'wp-doeda.com|hentai|elf']);
+  assert.ok(CATEGORIES.every((c) => c.id.startsWith('r-') && !isAnimated(c.title) && !isAnimated(c.term)), 'çizim kategorisi kalmamalı');
   assert.deepEqual(interleave([[1, 2], [3], []]), [1, 3, 2]);
   assert.deepEqual(sortVideos([v('a', '1', 'x', 100), v('a', '2', 'y', 0), v('a', '3', 'z', 50)], 'shortest').map((x) => x.remoteID), ['3', '1', '2']);
+});
+
+test('çizim (hentai/animasyon) içerik süzülür', () => {
+  for (const drawn of ['Uncensored Hentai Ep 2', '3D animated parody', 'Anime girl', 'Çizgi film parodisi']) assert.ok(isAnimated(drawn), drawn);
+  for (const real of ['Animal print bikini', 'Amateur couple', 'Japanese massage', 'Manager in the office']) assert.ok(!isAnimated(real), real);
+  assert.ok(isAnimated(v('x', '1', 'Fine', 0, { tags: ['hentai'] })));
+  assert.deepEqual(sanitize(['blonde', 'hentai', 'masaj']), ['blonde', 'masaj']);
+});
+
+test('doğrudan oynatma: XVideos/XNXX akışları ve Doeda oynatıcı kaynakları', () => {
+  const html = "<script>html5player.setVideoUrlLow('https://mp4.x/240.mp4?s=1');html5player.setVideoUrlHigh('https://mp4.x/360.mp4?s=1');html5player.setVideoHLS('https://hls.x/t==,1/hls.m3u8');</script>";
+  assert.deepEqual(parseXStreams(html).map((x) => [x.label, x.hls]), [['Otomatik (HD)', true], ['360p', false], ['240p', false]]);
+  assert.deepEqual(parseXStreams('<html></html>'), []);
+  const ok = parseJetSources('{"status":"true","source":[{"file":"https://c/480.mp4","label":"480p"},{"file":"//c/720.mp4","label":"720p HD"}]}');
+  assert.deepEqual(ok.videos.map((x) => [x.label, x.url]), [['720p', 'https://c/720.mp4'], ['480p', 'https://c/480.mp4']]);
+  assert.equal(parseJetSources('{"source":"x","iframe":"//host.example/e/1"}').iframe, 'https://host.example/e/1');
+  const fail = parseJetSources('{"status":"false","alternative":"fembed"}');
+  assert.ok(fail.failed && fail.alternative === 'fembed' && !fail.videos.length);
+  assert.ok(parseJetSources('<html>').failed);
+});
+
+test('doğrudan oynatma: video sayfası aracıdan okunur, yoksa gömülüye düşülür', async () => {
+  const page = "<script>html5player.setVideoHLS('https://hls.x/a/hls.m3u8');</script>";
+  const calls = [];
+  const relayed = createNet({ relayBase: 'https://app.example/r', fetchImpl: async (url) => { calls.push(url); return new Response(page); } });
+  const vid = { pageURL: 'https://www.xvideos.com/video.abc/x', embedURL: 'https://www.xvideos.com/embedframe/abc' };
+  const src = await xvideos.playback(vid, relayed);
+  assert.equal(src.videos[0].url, 'https://hls.x/a/hls.m3u8');
+  assert.equal(src.fallback, vid.embedURL);
+  assert.ok(calls[0].startsWith('https://app.example/r?u=https%3A%2F%2Fwww.xvideos.com%2Fvideo.abc'));
+  // aracı yoksa gömülü oynatıcı
+  assert.deepEqual(await xvideos.playback(vid, createNet({ fetchImpl: async () => new Response(page) })), { embed: vid.embedURL });
 });
 
 test('kaynak ayrıştırıcıları (gerçek yanıt biçimlerinden örnekler)', () => {
   const ep = eporner.parse({ videos: [{ id: '27zf', title: 'Sample Clip', keywords: 'blonde, massage', views: 285, rate: '4.50',
     url: 'https://www.eporner.com/video-27zf/x/', added: '2026-11-13 22:22:15', length_sec: 1291,
-    embed: 'https://www.eporner.com/embed/27zf/', default_thumb: { src: 'https://cdn/7_360.jpg' } }] }, 'real')[0];
+    embed: 'https://www.eporner.com/embed/27zf/', default_thumb: { src: 'https://cdn/7_360.jpg' } }] })[0];
   assert.equal(ep.id, 'eporner:27zf');
   assert.equal(ep.rating, 90);
   assert.deepEqual(ep.tags, ['blonde', 'massage']);
   assert.ok(ep.addedAt > 0);
 
   const ph = pornhub.parse({ videos: [{ duration: '3:01', views: 40, video_id: '6aef', rating: 100, title: 'Sample', url: 'https://www.pornhub.com/view_video.php?viewkey=6aef',
-    default_thumb: 'https://pix/x.jpg', publish_date: '2026-11-15 14:00:05', tags: [{ tag_name: 'pov' }] }] }, 'real')[0];
+    default_thumb: 'https://pix/x.jpg', publish_date: '2026-11-15 14:00:05', tags: [{ tag_name: 'pov' }] }] })[0];
   assert.equal(ph.durationSec, 181);
   assert.equal(ph.embedURL, 'https://www.pornhub.com/embed/6aef');
 
   const rt = redtube.parse({ videos: [{ video: { duration: '0:21', views: 7, video_id: '309', rating: 0, title: 'Sample', url: 'https://www.redtube.com/309',
-    embed_url: 'https://embed.redtube.com/?id=309', default_thumb: 'https://ei/(m=e)(mh=1)9.jpg', tags: [] } }] }, 'real')[0];
+    embed_url: 'https://embed.redtube.com/?id=309', default_thumb: 'https://ei/(m=e)(mh=1)9.jpg', tags: [] } }] })[0];
   assert.equal(rt.id, 'redtube:309');
   assert.equal(rt.embedURL, 'https://embed.redtube.com/?id=309');
 
   const xhtml = `<div id="video_ufim" data-id="83000781" data-eid="ufimdcde2e5" class="thumb-block"><div class="thumb"><a href="/video.ufimdcde2e5/sample"><img src="https://x/lightbox-blank.gif" data-src="https://thumb/xv_29_t.jpg"><span class="video-hd-mark">1080p</span></a></div><p class="title"><a href="/video.ufimdcde2e5/sample" title="Sample &amp; session">Sample <span class="duration">12 min</span></a></p><p class="metadata"><span class="duration">12 min</span><span> - </span> 7M <span class="sprfluous">Views</span></p></div>`;
-  const xv = parseXSearch(xhtml, { id: 'xvideos', host: 'www.xvideos.com' }, 'real')[0];
+  const xv = parseXSearch(xhtml, { id: 'xvideos', host: 'www.xvideos.com' })[0];
   assert.equal(xv.title, 'Sample & session');
   assert.equal(xv.durationSec, 720);
   assert.equal(xv.views, 7000000);
@@ -141,7 +170,7 @@ test('kaynak ayrıştırıcıları (gerçek yanıt biçimlerinden örnekler)', (
   const wp = parseWordPress([{ id: 65392, date_gmt: '2026-11-14T10:10:22', link: 'http://www.doeda.com/ornek/', title: { rendered: 'Masaj &#8211; Örnek' },
     views: '131', class_list: ['post-1', 'category-18-yas-x', 'category-masaj-1', 'tag-hd'],
     _embedded: { 'wp:featuredmedia': [{ source_url: 'http://www.doeda.com/a.jpeg', media_details: { sizes: { medium: { source_url: 'http://www.doeda.com/a-300.jpeg' } } } }] } },
-    { id: 7, link: 'https://x/b/', title: { rendered: 'Görselsiz' }, _embedded: { 'wp:featuredmedia': [{ code: 'rest_post_invalid_id' }] } }], DOEDA, 'real');
+    { id: 7, link: 'https://x/b/', title: { rendered: 'Görselsiz' }, _embedded: { 'wp:featuredmedia': [{ code: 'rest_post_invalid_id' }] } }], DOEDA);
   assert.equal(wp[0].title, 'Masaj – Örnek');
   assert.equal(wp[0].views, 131);
   assert.equal(wp[0].thumbnail, 'http://www.doeda.com/a.jpeg');
@@ -164,13 +193,13 @@ test('ağ katmanı: aracı gereken istekler aracıdan geçer, yoksa anlaşılır
   const calls = [];
   const fetchImpl = async (url, init) => { calls.push([url, init.method]); return new Response('{"videos":[]}', { status: 200 }); };
   const direct = createNet({ fetchImpl });
-  await assert.rejects(() => pornhub.search({ terms: ['x'], kind: 'real', sort: 'relevance', page: 1 }, direct), RelayNeededError);
+  await assert.rejects(() => pornhub.search({ terms: ['x'], sort: 'relevance', page: 1 }, direct), RelayNeededError);
   assert.match(describeError(new RelayNeededError()), /aracı/);
-  await eporner.search({ terms: ['x'], kind: 'real', sort: 'relevance', page: 1 }, direct);
+  await eporner.search({ terms: ['x'], sort: 'relevance', page: 1 }, direct);
   assert.ok(calls[0][0].startsWith('https://www.eporner.com/api/v2/video/search/?query=x'));
 
   const relayed = createNet({ relayBase: 'https://app.example/r', fetchImpl });
-  await pornhub.search({ terms: ['x'], kind: 'hentai', sort: 'newest', page: 2 }, relayed);
+  await pornhub.search({ terms: ['hentai', 'x'], sort: 'newest', page: 2 }, relayed);
   const last = calls.at(-1)[0];
   assert.ok(last.startsWith('https://app.example/r?u=https%3A%2F%2Fwww.pornhub.com%2Fwebmasters%2Fsearch%3Fsearch%3Dhentai%2Bx'), last);
   assert.equal(relayed.asset('http://www.doeda.com/a.jpg'), 'https://app.example/r?u=http%3A%2F%2Fwww.doeda.com%2Fa.jpg');
@@ -199,9 +228,9 @@ test('geçmiş ve favoriler cihazda saklanır; aynı video başka sitede de tan�
 
 test('arama denetleyicisi: birleştirir, süzer, aracı gerektirenleri atlar', async () => {
   const store = createStore(memoryStorage());
-  const fake = (id, relayForSearch, list, lang = 'en') => ({ id, name: id.toUpperCase(), kinds: ['real', 'hentai'], lang, relayForSearch,
-    search: async (q) => (q.page === 1 ? list.map((x) => ({ ...x, kind: q.kind })) : []) });
-  const a = fake('a', false, [v('a', '1', 'Morning yoga session outdoors', 900), v('a', '2', 'Blocked loli title', 100), v('a', '3', 'Unique clip from a', 300)]);
+  const fake = (id, relayForSearch, list, lang = 'en') => ({ id, name: id.toUpperCase(), lang, relayForSearch,
+    search: async (q) => (q.page === 1 ? list : []) });
+  const a = fake('a', false, [v('a', '1', 'Morning yoga session outdoors', 900), v('a', '2', 'Blocked loli title', 100), v('a', '3', 'Unique clip from a', 300), v('a', '4', 'Hentai episode', 400)]);
   const b = fake('b', false, [v('b', '1', 'Morning Yoga Session Outdoors HD', 901), v('b', '2', 'Unique clip from b', 400)]);
   const c = fake('c', true, [v('c', '1', 'Needs relay', 500)]);
   const failing = { ...fake('d', false, []), name: 'D', search: async () => { throw new TypeError('ağ'); } };
@@ -209,7 +238,6 @@ test('arama denetleyicisi: birleştirir, süzer, aracı gerektirenleri atlar', a
   const net = createNet({ fetchImpl: async () => new Response('{}') });
   let changes = 0;
   const browser = createBrowser({ net, store, getProviders: () => [a, b, c, failing], onChange: () => changes++ });
-  browser.state.kindFilter = 'real';
   await browser.refresh();
   assert.deepEqual(browser.state.videos.map((x) => x.id), ['a:1', 'b:2', 'a:3']);
   assert.equal(browser.state.hiddenDuplicates, 1);
@@ -243,12 +271,12 @@ test('gerçek site yanıtları (VITRIN_SAMPLES verilirse)', { skip: !samples }, 
     if (needDuration) assert.ok(list.filter((x) => x.durationSec > 0).length >= list.length * 0.9);
     assert.ok(list.filter((x) => x.thumbnail).length >= list.length * 0.9);
   };
-  const ph = pornhub.parse(JSON.parse(sample('pornhub.json')), 'real'); check(ph, 20);
-  const rt = redtube.parse(JSON.parse(sample('redtube.json')), 'real'); check(rt, 15);
-  const xv = parseXSearch(sample('xvideos_search.html'), { id: 'xvideos', host: 'www.xvideos.com' }, 'real'); check(xv, 20);
-  const xn = parseXSearch(sample('xnxx_search.html'), { id: 'xnxx', host: 'www.xnxx.com' }, 'real'); check(xn, 20);
-  check(parseWordPress(JSON.parse(sample('wp_doeda_com.json')), DOEDA, 'real'), 2, false);
-  check(parseWordPress(JSON.parse(sample('wp_doeda_one.json')), DOEDA_ONE, 'real'), 1, false);
+  const ph = pornhub.parse(JSON.parse(sample('pornhub.json'))); check(ph, 20);
+  const rt = redtube.parse(JSON.parse(sample('redtube.json'))); check(rt, 15);
+  const xv = parseXSearch(sample('xvideos_search.html'), { id: 'xvideos', host: 'www.xvideos.com' }); check(xv, 20);
+  const xn = parseXSearch(sample('xnxx_search.html'), { id: 'xnxx', host: 'www.xnxx.com' }); check(xn, 20);
+  check(parseWordPress(JSON.parse(sample('wp_doeda_com.json')), DOEDA), 2, false);
+  check(parseWordPress(JSON.parse(sample('wp_doeda_one.json')), DOEDA_ONE), 1, false);
   assert.match(findPlayer(sample('doeda_page.html'), 'http://www.doeda.com/x/').embed, /play\.php\?vid=[0-9a-f]{32}$/);
 
   const all = [...ph, ...rt, ...xv, ...xn].filter(isAllowed);

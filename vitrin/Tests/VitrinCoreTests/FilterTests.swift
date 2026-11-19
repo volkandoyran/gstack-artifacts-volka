@@ -2,8 +2,8 @@ import XCTest
 @testable import VitrinCore
 
 private func video(_ provider: String, _ id: String, _ title: String, _ duration: Int = 0,
-                   views: Int = 0, height: Int? = nil, kind: ContentKind = .real, tags: [String] = []) -> Video {
-    Video(providerID: provider, remoteID: id, kind: kind, title: title, durationSec: duration,
+                   views: Int = 0, height: Int? = nil, tags: [String] = []) -> Video {
+    Video(providerID: provider, remoteID: id, title: title, durationSec: duration,
           views: views, tags: tags, maxHeight: height)
 }
 
@@ -97,9 +97,15 @@ final class SafetyFilterTests: XCTestCase {
         }
     }
 
-    func testSchoolThemeOnlyBlockedForDrawnContent() {
-        XCTAssertTrue(SafetyFilter.isBlocked("school girl", kind: .hentai))
-        XCTAssertFalse(SafetyFilter.isBlocked("school girl", kind: .real))
+    func testAnimatedContentIsFilteredOut() {
+        for drawn in ["Uncensored Hentai Ep 2", "3D animated parody", "Anime girl", "Çizgi film parodisi", "HENTAI"] {
+            XCTAssertTrue(AnimatedFilter.isAnimated(drawn), drawn)
+        }
+        for real in ["Animal print bikini", "Amateur couple", "Japanese massage", "Manager in the office"] {
+            XCTAssertFalse(AnimatedFilter.isAnimated(real), real)
+        }
+        XCTAssertTrue(AnimatedFilter.isAnimated(video("x", "1", "Fine title", tags: ["hentai"])))
+        XCTAssertEqual(AnimatedFilter.sanitize(["blonde", "hentai", "masaj"]), ["blonde", "masaj"])
     }
 
     func testVideoAndTermFiltering() {
@@ -134,7 +140,7 @@ final class WatchHistoryTests: XCTestCase {
 final class FavoritesStoreTests: XCTestCase {
     func testFavoritesPersistAndToggle() async {
         let suite = "vitrin.tests.\(UUID().uuidString)"
-        let a = Video(providerID: "eporner", remoteID: "1", kind: .real, title: "A",
+        let a = Video(providerID: "eporner", remoteID: "1", title: "A",
                       thumbnail: URL(string: "https://cdn/a.jpg"), durationSec: 60, addedAt: Date(timeIntervalSince1970: 1_700_000_000),
                       tags: ["x"], embedURL: URL(string: "https://e/1"), maxHeight: 720)
         let b = video("xvideos", "2", "B", 30)

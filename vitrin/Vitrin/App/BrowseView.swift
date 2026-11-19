@@ -7,11 +7,6 @@ struct BrowseView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    Picker("Tür", selection: $model.kindFilter) {
-                        ForEach(KindFilter.allCases) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-
                     categoryChips
                     controls
 
@@ -61,7 +56,6 @@ struct BrowseView: View {
                 }
             }
             .refreshable { model.refresh() }
-            .onChange(of: model.kindFilter) { model.refresh() }
             .onChange(of: model.selected) { model.refresh() }
             .onChange(of: model.combine) { if model.selected.count > 1 { model.refresh() } }
             .onChange(of: model.sort) { model.refresh() }
@@ -90,12 +84,7 @@ struct BrowseView: View {
                 ForEach(model.visibleCategories) { c in
                     let on = model.selected.contains(c.id)
                     Button { model.toggle(c) } label: {
-                        HStack(spacing: 4) {
-                            if model.kindFilter == .all {
-                                Image(systemName: c.kind == .hentai ? "sparkle" : "person.fill").font(.caption2)
-                            }
-                            Text(c.title)
-                        }
+                        Text(c.title)
                         .font(.subheadline)
                         .padding(.horizontal, 12).padding(.vertical, 7)
                         .background(on ? Color.accentColor : Color.secondary.opacity(0.15), in: Capsule())

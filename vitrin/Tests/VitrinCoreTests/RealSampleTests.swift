@@ -32,26 +32,26 @@ final class RealSampleTests: XCTestCase {
     }
 
     func testPornhub() throws {
-        check(try WebmasterAPI.videos(from: try sample("pornhub.json"), provider: "pornhub", kind: .real) {
+        check(try WebmasterAPI.videos(from: try sample("pornhub.json"), provider: "pornhub") {
             URL(string: "https://www.pornhub.com/embed/\($0)")
         }, min: 20)
     }
 
     func testRedTube() throws {
-        let list = try WebmasterAPI.videos(from: try sample("redtube.json"), provider: "redtube", kind: .real) { _ in nil }
+        let list = try WebmasterAPI.videos(from: try sample("redtube.json"), provider: "redtube") { _ in nil }
         check(list, min: 15)
         XCTAssertTrue(list.allSatisfy { $0.embedURL != nil })
     }
 
     func testXVideosSearch() throws {
-        let list = XVideosProvider.parseSearch(html: try text("xvideos_search.html"), site: .xvideos, kind: .real)
+        let list = XVideosProvider.parseSearch(html: try text("xvideos_search.html"), site: .xvideos)
         check(list, min: 20)
         XCTAssertGreaterThan(list.filter { $0.views > 0 }.count, list.count / 2)
         XCTAssertTrue(list.allSatisfy { $0.pageURL?.host == "www.xvideos.com" })
     }
 
     func testXNXXSearch() throws {
-        let list = XVideosProvider.parseSearch(html: try text("xnxx_search.html"), site: .xnxx, kind: .real)
+        let list = XVideosProvider.parseSearch(html: try text("xnxx_search.html"), site: .xnxx)
         check(list, min: 20)
         XCTAssertGreaterThan(list.filter { $0.views > 0 }.count, list.count / 2)
     }
@@ -64,10 +64,10 @@ final class RealSampleTests: XCTestCase {
     }
 
     func testDoedaPosts() throws {
-        let com = try WordPressProvider.videos(from: try sample("wp_doeda_com.json"), site: .doeda, kind: .real)
+        let com = try WordPressProvider.videos(from: try sample("wp_doeda_com.json"), site: .doeda)
         check(com, min: 2, needsDuration: false)
         XCTAssertTrue(com.allSatisfy { $0.views > 0 && !$0.tags.isEmpty })
-        let one = try WordPressProvider.videos(from: try sample("wp_doeda_one.json"), site: .doedaOne, kind: .real)
+        let one = try WordPressProvider.videos(from: try sample("wp_doeda_one.json"), site: .doedaOne)
         check(one, min: 1, needsDuration: false)
     }
 
@@ -82,10 +82,10 @@ final class RealSampleTests: XCTestCase {
 
     /// Gerçek sonuçları birlikte süzgeçten geçirir (çökme / aşırı birleştirme olmamalı).
     func testFiltersOnRealMix() throws {
-        var all = try WebmasterAPI.videos(from: try sample("pornhub.json"), provider: "pornhub", kind: .real) { _ in nil }
-        all += try WebmasterAPI.videos(from: try sample("redtube.json"), provider: "redtube", kind: .real) { _ in nil }
-        all += XVideosProvider.parseSearch(html: try text("xvideos_search.html"), site: .xvideos, kind: .real)
-        all += XVideosProvider.parseSearch(html: try text("xnxx_search.html"), site: .xnxx, kind: .real)
+        var all = try WebmasterAPI.videos(from: try sample("pornhub.json"), provider: "pornhub") { _ in nil }
+        all += try WebmasterAPI.videos(from: try sample("redtube.json"), provider: "redtube") { _ in nil }
+        all += XVideosProvider.parseSearch(html: try text("xvideos_search.html"), site: .xvideos)
+        all += XVideosProvider.parseSearch(html: try text("xnxx_search.html"), site: .xnxx)
         let safe = all.filter(SafetyFilter.isAllowed)
         var normal = DuplicateFilter(level: .normal), strict = DuplicateFilter(level: .strict)
         let n = normal.admit(safe), s = strict.admit(safe)

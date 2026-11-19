@@ -13,7 +13,6 @@ struct SettingsView: View {
     @State private var newName = ""
     @State private var newAddress = ""
     @State private var newLanguage = Lang.tr
-    @State private var newHentaiOnly = false
     @State private var addError: String?
     // Yapay zekâ
     @AppStorage(AIConfig.engineKey) private var engine = AIEngine.auto.rawValue
@@ -108,7 +107,6 @@ struct SettingsView: View {
             VStack(alignment: .leading) {
                 Text(verbatim: p.displayName)
                 Text(verbatim: ([p.language == .tr ? "Türkçe" : "Yabancı"]
-                                + p.kinds.map(\.title).sorted()
                                 + (p.nativeQuality ? ["uygulama içi kalite"] : [])).joined(separator: " · "))
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -123,7 +121,6 @@ struct SettingsView: View {
             Picker("Arama dili", selection: $newLanguage) {
                 ForEach(Lang.allCases) { Text($0.title).tag($0) }
             }
-            Toggle("Sadece hentai sitesi", isOn: $newHentaiOnly)
             Button("Siteyi ekle") { addSite() }
                 .disabled(newAddress.trimmingCharacters(in: .whitespaces).isEmpty)
             if let addError { Text(verbatim: addError).font(.caption).foregroundStyle(.red) }
@@ -134,7 +131,7 @@ struct SettingsView: View {
 
     private func addSite() {
         guard let site = WordPressSite.custom(name: newName, address: newAddress,
-                                              language: newLanguage, hentaiOnly: newHentaiOnly) else {
+                                              language: newLanguage) else {
             addError = "Alan adı geçersiz görünüyor."
             return
         }

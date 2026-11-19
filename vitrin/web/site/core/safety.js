@@ -10,18 +10,24 @@ const ALWAYS = [
   /\b(1[0-7]|[1-9])\s*yas\w*/,
   /\b(bestiality|zoophil\w*|zoo ?porn|hayvanla)\b/,
 ];
-// Çizim içerikte okul teması çoğunlukla reşit olmayan karakter demektir.
-const HENTAI_ONLY = [/\b(school ?girl\w*|school ?boy\w*|high ?school\w*|middle ?school\w*|okullu\w*)\b/];
-
-export function isBlocked(text, kind) {
+export function isBlocked(text) {
   const t = asciiFold(text);
-  return (kind === 'hentai' ? ALWAYS.concat(HENTAI_ONLY) : ALWAYS).some((re) => re.test(t));
+  return ALWAYS.some((re) => re.test(t));
 }
 
 export function isAllowed(video) {
-  return !isBlocked(video.title, video.kind) && !(video.tags || []).some((t) => isBlocked(t, video.kind));
+  return !isBlocked(video.title) && !(video.tags || []).some(isBlocked);
 }
 
 export function sanitize(terms) {
-  return terms.filter((t) => !isBlocked(t, 'hentai'));
+  return terms.filter((t) => !isBlocked(t) && !isAnimated(t));
+}
+
+// Uygulama yalnızca gerçek (çizim olmayan) videoları gösterir: hentai / animasyon / çizgi
+// etiketli sonuçlar gerçek video sitelerinden gelse bile listeden çıkarılır.
+const ANIMATED = /\b(hentai\w*|anime|animated|animation|cartoons?|toons?|manga|doujin\w*|animasyon\w*|cizgi film\w*|cizgi)\b/;
+
+export function isAnimated(textOrVideo) {
+  if (typeof textOrVideo === 'string') return ANIMATED.test(asciiFold(textOrVideo));
+  return isAnimated(textOrVideo.title) || (textOrVideo.tags || []).some((t) => isAnimated(t));
 }

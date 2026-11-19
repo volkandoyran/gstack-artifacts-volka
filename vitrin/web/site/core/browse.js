@@ -2,13 +2,13 @@
 // Arayüzden bağımsızdır (Node'da test edilebilir); değişiklikleri onChange ile bildirir.
 import { CATEGORIES, bilingual } from './catalog.js';
 import { DuplicateFilter } from './dedupe.js';
-import { isAllowed, sanitize } from './safety.js';
+import { isAllowed, isAnimated, sanitize } from './safety.js';
 import { planJobs, interleave, sortVideos, prefer } from './planner.js';
 import { describeError, RelayNeededError } from './net.js';
 
 export function createBrowser({ net, store, getProviders, onChange = () => {} }) {
   const state = {
-    kindFilter: 'all', selected: new Set(), freeText: '', combine: 'all', sort: 'relevance',
+    selected: new Set(), freeText: '', combine: 'all', sort: 'relevance',
     videos: [], failures: {}, loading: false, hiddenDuplicates: 0, hiddenWatched: 0,
     alternates: new Map(), skippedForRelay: [],
   };
@@ -31,7 +31,7 @@ export function createBrowser({ net, store, getProviders, onChange = () => {} })
     state.skippedForRelay = all.filter((p) => !usable.includes(p)).map((p) => p.name);
 
     const jobs = planJobs({
-      providers: usable, kindFilter: state.kindFilter,
+      providers: usable,
       selected: CATEGORIES.filter((c) => state.selected.has(c.id)),
       free: freeTerms(), combine: state.combine, sort: state.sort, page,
     });
@@ -48,7 +48,7 @@ export function createBrowser({ net, store, getProviders, onChange = () => {} })
     // 1) güvenlik  2) aynı kimlik  3) izlenenler  4) yinelenenler  5) sıralama
     // Daha önce görülmemiş kimlikler. Hiç yenisi yoksa (site aynı sayfayı tekrar veriyorsa) liste bitmiştir.
     const fresh = interleave(buckets).filter((v) => !seen.has(v.id) && seen.add(v.id));
-    let batch = fresh.filter(isAllowed);
+    let batch = fresh.filter((v) => isAllowed(v) && !isAnimated(v));
     if (settings.hideWatched) {
       const before = batch.length;
       batch = batch.filter((v) => !store.isWatched(v));

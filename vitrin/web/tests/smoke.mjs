@@ -45,12 +45,16 @@ const DOEDA_ONE = [wpPost(21, 'https://www.doeda.one', 'Eski arkadaşlar buluşm
 const DOEDA_PAGE = '<html><body><div id="video"><iframe src="https://oynatici.test/player/play.php?vid=0123456789abcdef0123456789abcdef"></iframe></div></body></html>';
 
 const seen = [];   // aracıya gelen dış istekler
+const sawMedia = [];   // tarayıcının doğrudan istediği video dosyaları
 async function fakeUpstream(url) {
   seen.push(url);
   const u = new URL(url);
   const respond = (body, type) => new Response(body, { status: 200, headers: { 'Content-Type': type } });
   if (u.hostname === 'www.pornhub.com') return respond(JSON.stringify(PORNHUB), 'application/json');
   if (u.hostname === 'api.redtube.com') return respond(JSON.stringify(REDTUBE), 'application/json');
+  if (u.hostname === 'www.xvideos.com' && u.pathname.startsWith('/video.')) {
+    return respond("<script>html5player.setVideoHLS('https://media.test/hls.m3u8');html5player.setVideoUrlHigh('https://media.test/360.mp4');</script>", 'text/html');
+  }
   if (u.hostname === 'www.xvideos.com') return respond(XVIDEOS, 'text/html');
   if (u.hostname === 'www.xnxx.com') return respond(XNXX, 'text/html');
   if (u.hostname === 'www.doeda.com' && u.pathname.startsWith('/wp-json/')) return respond(JSON.stringify(u.searchParams.get('page') === '1' ? DOEDA : []), 'application/json');
@@ -97,6 +101,7 @@ async function openApp(browser, base) {
     if (u.hostname === 'www.eporner.com' && u.pathname.startsWith('/api/')) return json(u.searchParams.get('page') === '1' ? EPORNER : { videos: [] });
     if (u.hostname === 'www.doeda.one' && u.pathname.startsWith('/wp-json/')) return json(u.searchParams.get('page') === '1' ? DOEDA_ONE : []);
     if (u.hostname === 'img.test' || u.pathname.endsWith('.jpeg')) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: thumb(u.pathname.replace(/\W/g, '').slice(0, 6), hueOf(u.pathname)) });
+    if (u.hostname === 'media.test') { sawMedia.push(u.href); return route.fulfill({ status: 404, body: 'yok' }); }
     if (/embed|play\.php/.test(u.href)) return route.fulfill({ status: 200, contentType: 'text/html', body: `<meta charset="utf-8"><body style="margin:0;background:#111;color:#fff;font:16px sans-serif;display:grid;place-items:center;height:100vh;text-align:center">▶ sahte oynatıcı<br>${u.hostname}</body>` });
     return route.abort();
   });
@@ -124,7 +129,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('#grid .card').length >= 8 && !document.querySelector('.loading'));
 
   const list = await titles(page);
-  assert.equal(list.length, 9, `9 kart beklenirdi: ${list.join(' | ')}`);
+  assert.equal(list.length, 8, `8 kart beklenirdi: ${list.join(' | ')}`);
   assert.ok(!list.some((t) => /liseli/i.test(t)), 'güvenlik filtresi');
   assert.equal(list.filter((t) => /sahil boyunca/i.test(t)).length, 1, 'aynı video (Eporner + Pornhub) tek kart');
   assert.equal(list.filter((t) => /havuz/i.test(t)).length, 1, 'aynı video (Pornhub + RedTube) tek kart');
@@ -147,15 +152,15 @@ try {
   await page.click('.chip.clear');
   await page.fill('input[name=q]', '');
   await page.press('input[name=q]', 'Enter');
-  await page.waitForFunction(() => document.querySelectorAll('#grid .card').length === 9 && !document.querySelector('.loading'));
+  await page.waitForFunction(() => document.querySelectorAll('#grid .card').length === 8 && !document.querySelector('.loading'));
 
   // Oynatıcı: korumalı çerçeve, kaynak değiştirme, favori
   await page.click('#grid .card:has-text("Sahil Boyunca")');
   await page.waitForSelector('#player iframe');
   const frame = await page.$eval('#player iframe', (f) => ({ src: f.src, sandbox: f.getAttribute('sandbox'), ref: f.getAttribute('referrerpolicy') }));
   assert.ok(/pornhub\.com\/embed\/p1|eporner\.com\/embed\/e1/.test(frame.src), frame.src);
-  assert.equal(frame.sandbox, 'allow-scripts allow-same-origin allow-presentation', 'açılır pencere / üst sayfa izni olmamalı');
-  assert.equal(frame.ref, 'no-referrer');
+  assert.equal(frame.sandbox, 'allow-scripts allow-same-origin allow-presentation allow-forms', 'açılır pencere / üst sayfa izni olmamalı');
+  assert.equal(frame.ref, 'origin');
   assert.equal(await page.$$eval('#player select option', (o) => o.length), 2, 'iki kaynak seçilebilmeli');
   await page.selectOption('#player select', '1');
   await page.waitForFunction((old) => document.querySelector('#player iframe')?.src !== old, frame.src);
@@ -169,6 +174,14 @@ try {
   assert.match(await page.$eval('#player iframe', (f) => f.src), /^https:\/\/oynatici\.test\/player\/play\.php\?vid=[0-9a-f]{32}$/);
   await page.click('#player [aria-label="Kapat"]');
 
+  // XVideos: video sayfası aracıdan okunur, akış doğrudan <video> ile açılır; açılmazsa gömülüye geçilir.
+  await page.click('#grid .card:has-text("Dağ evinde")');
+  await page.waitForSelector('#player iframe');   // sahte akış 404 verir -> gömülü oynatıcıya düşülmeli
+  assert.match(await page.$eval('#player iframe', (f) => f.src), /^https:\/\/www\.xvideos\.com\/embedframe\/xv1$/);
+  assert.match(await page.textContent('#player'), /doğrudan açılamadı/);
+  assert.ok(sawMedia.some((u) => u.endsWith('/360.mp4')), 'önce doğrudan akış denenmeli');
+  await page.click('#player [aria-label="Kapat"]');
+
   // Favoriler ve izlenenleri gizleme
   await page.click('[aria-label="Favoriler"]');
   assert.equal((await titles(page)).length, 1);
@@ -176,11 +189,11 @@ try {
   await page.click('[aria-label="Ayarlar"]');
   await page.waitForSelector('#settings h3');
   assert.match(await page.textContent('#settings'), /Durum: bağlı/);
-  assert.match(await page.textContent('#settings'), /İzleme geçmişini temizle \(2 video\)/);
+  assert.match(await page.textContent('#settings'), /İzleme geçmişini temizle \(3 video\)/);
   await shot(page, '4-ayarlar.png');
   await page.click('#settings label:has-text("İzlediklerimi gizle") input');
   await page.click('#settings [aria-label="Kapat"]');
-  await page.waitForFunction(() => document.querySelectorAll('#grid .card').length === 7 && !document.querySelector('.loading'));
+  await page.waitForFunction(() => document.querySelectorAll("#grid .card").length === 5 && !document.querySelector('.loading'));
   assert.match(await page.textContent('#head'), /izlenmiş/);
 
   // Kurulum profili
@@ -200,6 +213,7 @@ try {
   const direct = await titles(second.page);
   assert.equal(direct.length, 3, direct.join(' | '));   // Eporner (2) + Doeda One (1)
   assert.match(await second.page.textContent('#head'), /Aracı olmadığı için kapalı: XVideos, XNXX, Pornhub, RedTube, Doeda\./);
+  assert.equal(await second.page.$('.seg'), null, 'Hentai/tür seçimi kalmamalı');
   await second.page.click('#grid .card:has-text("Eski arkadaşlar")');
   await second.page.waitForSelector('#player .frame.center');
   assert.match(await second.page.textContent('#player'), /aracı \(relay\) gerekli/);
@@ -207,7 +221,7 @@ try {
   await second.context.close();
   bare.close();
 
-  console.log('Uçtan uca deneme başarılı: 18+ kapısı, güvenlik filtresi, yinelenen birleştirme, iki dilli arama, korumalı oynatıcı, kaynak değiştirme, favoriler, izlenenleri gizleme, profil, aracısız kip.');
+  console.log('Uçtan uca deneme başarılı: 18+ kapısı, güvenlik filtresi, yinelenen birleştirme, iki dilli arama, korumalı oynatıcı, doğrudan akış + gömülüye düşme, kaynak değiştirme, favoriler, izlenenleri gizleme, profil, aracısız kip.');
 } catch (e) {
   failed = true;
   console.error('DENEME BAŞARISIZ:\n', e);

@@ -1,20 +1,14 @@
 // Arama planı, birleştirme ve sıralama (Swift çekirdeğindeki SearchPlanner ile aynı).
 
 /** Seçimlere göre hangi siteye hangi sorgunun gideceğini belirler. */
-export function planJobs({ providers, kindFilter, selected, free, combine, sort, page }) {
+export function planJobs({ providers, selected, free, combine, sort, page }) {
   const jobs = [];
-  for (const kind of ['real', 'hentai']) {
-    if (kindFilter !== 'all' && kindFilter !== kind) continue;
-    const cats = selected.filter((c) => c.kind === kind);
-    if (!cats.length && selected.length) continue;   // sadece diğer türden kategori seçilmiş
-    for (const provider of providers) {
-      if (!provider.kinds.includes(kind)) continue;
-      const tr = provider.lang === 'tr';
-      const extra = tr ? free.tr : free.en;
-      const terms = cats.map((c) => (tr ? c.termTR : c.term));
-      const sets = !terms.length ? [extra] : combine === 'all' ? [terms.concat(extra)] : terms.map((t) => [t].concat(extra));
-      for (const set of sets) jobs.push({ provider, query: { terms: set, kind, sort, page } });
-    }
+  for (const provider of providers) {
+    const tr = provider.lang === 'tr';
+    const extra = tr ? free.tr : free.en;
+    const terms = selected.map((c) => (tr ? c.termTR : c.term));
+    const sets = !terms.length ? [extra] : combine === 'all' ? [terms.concat(extra)] : terms.map((t) => [t].concat(extra));
+    for (const set of sets) jobs.push({ provider, query: { terms: set, sort, page } });
   }
   return jobs;
 }

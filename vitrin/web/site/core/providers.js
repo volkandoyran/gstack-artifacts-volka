@@ -1,5 +1,5 @@
-// Kaynak siteler. Her kaynak: { id, name, kinds, lang, relayForSearch, search(q, net), playback(v, net) }
-// q = { terms: [..], kind: 'real'|'hentai', sort, page }  (page 1'den başlar)
+// Kaynak siteler. Her kaynak: { id, name, lang, relayForSearch, search(q, net), playback(v, net) }
+// q = { terms: [..], sort, page }  (page 1'den başlar)
 // playback -> { embed: url } (korumalı çerçevede açılır) ya da { video: url } (doğrudan <video>)
 import { htmlDecode, stripTags, secondsFromClock, secondsFromLoose, countFromCompact, parseUTC } from './text.js';
 
@@ -10,16 +10,15 @@ function video(v) {
   };
 }
 
-const mixedTerms = (q) => (q.kind === 'hentai' ? ['hentai', ...q.terms] : q.terms);
 const first = (re, s) => { const m = re.exec(s); return m ? m[1] : null; };
 
 // ---------------------------------------------------------------- Eporner (resmi JSON API, CORS açık)
 
 export const eporner = {
-  id: 'eporner', name: 'Eporner', kinds: ['real', 'hentai'], lang: 'en', relayForSearch: false,
-  parse(data, kind) {
+  id: 'eporner', name: 'Eporner', lang: 'en', relayForSearch: false,
+  parse(data) {
     return (data.videos || []).map((v) => video({
-      providerID: 'eporner', remoteID: String(v.id), kind, title: v.title,
+      providerID: 'eporner', remoteID: String(v.id), title: v.title,
       thumbnail: v.default_thumb?.src || null,
       durationSec: Number(v.length_sec) || 0, views: Number(v.views) || 0, rating: (parseFloat(v.rate) || 0) * 20,
       addedAt: parseUTC(v.added),
@@ -29,20 +28,20 @@ export const eporner = {
   },
   async search(q, net) {
     const order = { newest: 'latest', mostViewed: 'most-popular', topRated: 'top-rated', longest: 'longest', shortest: 'shortest' }[q.sort] || 'most-popular';
-    const p = new URLSearchParams({ query: mixedTerms(q).join(' ') || 'all', per_page: '30', page: String(q.page),
+    const p = new URLSearchParams({ query: q.terms.join(' ') || 'all', per_page: '30', page: String(q.page),
       thumbsize: 'big', order, gay: '0', lq: '1', format: 'json' });
-    return this.parse(await net.json(`https://www.eporner.com/api/v2/video/search/?${p}`), q.kind);
+    return this.parse(await net.json(`https://www.eporner.com/api/v2/video/search/?${p}`));
   },
   async playback(v) { return { embed: v.embedURL }; },
 };
 
 // ---------------------------------------------------------------- Pornhub / RedTube (webmaster JSON API)
 
-function webmasterParse(data, providerID, kind, embedFor) {
+function webmasterParse(data, providerID, embedFor) {
   return (data.videos || []).map((entry) => {
     const v = entry.video || entry;
     return video({
-      providerID, remoteID: String(v.video_id), kind, title: v.title,
+      providerID, remoteID: String(v.video_id), title: v.title,
       thumbnail: v.default_thumb || v.thumb || null,
       durationSec: secondsFromClock(v.duration), views: Number(v.views) || 0, rating: parseFloat(v.rating) || 0,
       addedAt: parseUTC(v.publish_date), tags: (v.tags || []).map((t) => t.tag_name),
@@ -53,29 +52,29 @@ function webmasterParse(data, providerID, kind, embedFor) {
 const wmOrder = (s) => ({ newest: 'newest', topRated: 'rating' }[s] || 'mostviewed');
 
 export const pornhub = {
-  id: 'pornhub', name: 'Pornhub', kinds: ['real', 'hentai'], lang: 'en', relayForSearch: true,
-  parse: (data, kind) => webmasterParse(data, 'pornhub', kind, (id) => `https://www.pornhub.com/embed/${id}`),
+  id: 'pornhub', name: 'Pornhub', lang: 'en', relayForSearch: true,
+  parse: (data) => webmasterParse(data, 'pornhub', (id) => `https://www.pornhub.com/embed/${id}`),
   async search(q, net) {
-    const p = new URLSearchParams({ search: mixedTerms(q).join(' '), ordering: wmOrder(q.sort), page: String(q.page), thumbsize: 'large_hd' });
-    return this.parse(await net.json(`https://www.pornhub.com/webmasters/search?${p}`, { relay: true }), q.kind);
+    const p = new URLSearchParams({ search: q.terms.join(' '), ordering: wmOrder(q.sort), page: String(q.page), thumbsize: 'large_hd' });
+    return this.parse(await net.json(`https://www.pornhub.com/webmasters/search?${p}`, { relay: true }));
   },
   async playback(v) { return { embed: v.embedURL }; },
 };
 
 export const redtube = {
-  id: 'redtube', name: 'RedTube', kinds: ['real', 'hentai'], lang: 'en', relayForSearch: true,
-  parse: (data, kind) => webmasterParse(data, 'redtube', kind, (id) => `https://embed.redtube.com/?id=${id}`),
+  id: 'redtube', name: 'RedTube', lang: 'en', relayForSearch: true,
+  parse: (data) => webmasterParse(data, 'redtube', (id) => `https://embed.redtube.com/?id=${id}`),
   async search(q, net) {
-    const p = new URLSearchParams({ data: 'redtube.Videos.searchVideos', output: 'json', search: mixedTerms(q).join(' '),
+    const p = new URLSearchParams({ data: 'redtube.Videos.searchVideos', output: 'json', search: q.terms.join(' '),
       ordering: wmOrder(q.sort), page: String(q.page), thumbsize: 'big' });
-    return this.parse(await net.json(`https://api.redtube.com/?${p}`, { relay: true }), q.kind);
+    return this.parse(await net.json(`https://api.redtube.com/?${p}`, { relay: true }));
   },
   async playback(v) { return { embed: v.embedURL }; },
 };
 
 // ---------------------------------------------------------------- XVideos / XNXX (arama sayfası HTML'i)
 
-export function parseXSearch(html, site, kind) {
+export function parseXSearch(html, site) {
   const out = [];
   const starts = [...html.matchAll(/<div[^>]*\bid="video_[^"]*"[^>]*>/gi)];
   starts.forEach((m, i) => {
@@ -93,7 +92,7 @@ export function parseXSearch(html, site, kind) {
     const viewsText = first(/([\d.,]+\s*[kKmM]?)\s*Views/i, meta) || first(/^\s*([\d.,]+[kKmM]?)\s/, meta);
     const height = first(/>\s*(\d{3,4})p\s*</, block);
     out.push(video({
-      providerID: site.id, remoteID: numericID, kind, title,
+      providerID: site.id, remoteID: numericID, title,
       thumbnail: thumb ? htmlDecode(thumb) : null, durationSec: duration,
       views: viewsText ? countFromCompact(viewsText) : 0, rating: parseFloat(first(/(\d{1,3})\s*%/, meta) || '0') || 0,
       embedURL: `https://${site.host}/embedframe/${eid || numericID}`,
@@ -104,17 +103,34 @@ export function parseXSearch(html, site, kind) {
   return out;
 }
 
+/** XVideos/XNXX video sayfasından oynatılabilir akışlar: [{ label, url, hls }] (en iyisi başta). */
+export function parseXStreams(html) {
+  const get = (name) => first(new RegExp(`html5player\\.${name}\\('([^']+)'\\)`), html);
+  return [
+    { label: 'Otomatik (HD)', url: get('setVideoHLS'), hls: true },
+    { label: '360p', url: get('setVideoUrlHigh'), hls: false },
+    { label: '240p', url: get('setVideoUrlLow'), hls: false },
+  ].filter((x) => x.url && /^https:\/\//.test(x.url));
+}
+
 function xProvider(site) {
   return {
-    id: site.id, name: site.name, kinds: ['real', 'hentai'], lang: 'en', relayForSearch: true,
+    id: site.id, name: site.name, lang: 'en', relayForSearch: true,
     searchURL: site.searchURL,
     async search(q, net) {
-      const url = site.searchURL(mixedTerms(q).join(' '), q.page, q.sort);
+      const url = site.searchURL(q.terms.join(' '), q.page, q.sort);
       if (!url) return [];
-      return parseXSearch(await net.text(url, { relay: true }), site, q.kind);
+      return parseXSearch(await net.text(url, { relay: true }), site);
     },
-    // Sitenin gömülü oynatıcısı telefonun kendi bağlantısından yüklenir (aracıdan geçmez).
-    async playback(v) { return { embed: v.embedURL }; },
+    // Video sayfası aracıdan okunur, akış adresi çıkarılır; video telefonun kendi
+    // bağlantısından doğrudan oynatılır. Olmazsa sitenin gömülü oynatıcısına düşülür.
+    async playback(v, net) {
+      try {
+        const videos = parseXStreams(await net.text(v.pageURL, { relay: true }));
+        if (videos.length) return { videos, fallback: v.embedURL };
+      } catch { /* gömülüye düş */ }
+      return { embed: v.embedURL };
+    },
   };
 }
 
@@ -162,7 +178,28 @@ export function findPlayer(html, pageURL) {
   return null;
 }
 
-export function parseWordPress(posts, site, kind) {
+/** Jet Player kaynak yanıtı: {"source":[{"file":…,"label":"720p"}], "iframe":…, "status":…, "alternative":…} */
+export function parseJetSources(text) {
+  let obj;
+  try { obj = JSON.parse(text); } catch { return { videos: [], failed: true }; }
+  const out = { videos: [], failed: String(obj.status) === 'false' || String(obj.status) === '0', alternative: obj.alternative || null, iframe: null };
+  if (typeof obj.iframe === 'string' && obj.iframe) out.iframe = obj.iframe.startsWith('//') ? 'https:' + obj.iframe : obj.iframe;
+  const list = Array.isArray(obj.source) ? obj.source : typeof obj.source === 'string' ? [{ file: obj.source }] : [];
+  const seen = new Set();
+  for (const s of list) {
+    let file = typeof s.file === 'string' ? s.file : '';
+    if (file.startsWith('//')) file = 'https:' + file;
+    if (!/^https?:\/\//.test(file)) continue;
+    const height = parseInt((/(\d{3,4})/.exec(String(s.label || '')) || [])[1] || '0', 10);
+    if (seen.has(height)) continue;
+    seen.add(height);
+    out.videos.push({ label: height ? `${height}p` : 'Otomatik', url: file, hls: /\.m3u8/i.test(file), height });
+  }
+  out.videos.sort((a, b) => b.height - a.height);
+  return out;
+}
+
+export function parseWordPress(posts, site) {
   return posts.map((p) => {
     const title = stripTags(p.title?.rendered || '').trim();
     if (!title || !p.link) return null;
@@ -173,7 +210,7 @@ export function parseWordPress(posts, site, kind) {
       .filter((c) => c.startsWith('category-') || c.startsWith('tag-'))
       .map((c) => c.slice(c.indexOf('-') + 1).replace(/-(\d+|x|p)$/, '').replaceAll('-', ' '));
     return video({
-      providerID: site.id, remoteID: String(p.id), kind, title, thumbnail: thumb,
+      providerID: site.id, remoteID: String(p.id), title, thumbnail: thumb,
       views: parseInt(p.views, 10) || 0, addedAt: parseUTC(p.date_gmt), tags, pageURL: p.link,
     });
   }).filter(Boolean);
@@ -182,10 +219,10 @@ export function parseWordPress(posts, site, kind) {
 export function wordpress(site) {
   const insecure = site.baseURL.startsWith('http://');   // https sayfadan http okunamaz -> aracı
   return {
-    id: site.id, name: site.name, kinds: site.hentaiOnly ? ['hentai'] : ['real', 'hentai'], lang: site.lang,
+    id: site.id, name: site.name, lang: site.lang,
     relayForSearch: insecure, relayForPlayback: true, site,
     searchURL(q) {
-      const terms = (site.hentaiOnly ? q.terms : mixedTerms(q)).join(' ');
+      const terms = q.terms.join(' ');
       const p = new URLSearchParams({ per_page: '20', page: String(q.page), _embed: 'wp:featuredmedia',
         _fields: 'id,date_gmt,link,title,views,class_list,_links,_embedded' });
       if (terms) { p.set('search', terms); p.set('orderby', q.sort === 'newest' ? 'date' : 'relevance'); }
@@ -193,7 +230,7 @@ export function wordpress(site) {
     },
     async search(q, net) {
       try {
-        return parseWordPress(await net.json(this.searchURL(q), { relay: insecure }), site, q.kind);
+        return parseWordPress(await net.json(this.searchURL(q), { relay: insecure }), site);
       } catch (e) {
         if (e?.status === 400) return [];   // WordPress son sayfadan sonrasında 400 döndürür
         throw e;
@@ -203,16 +240,33 @@ export function wordpress(site) {
       const html = await net.text(v.pageURL, { relay: true });
       const player = findPlayer(html, v.pageURL);
       if (!player) throw new Error('Oynatılabilir kaynak bulunamadı.');
+      if (player.video) return { videos: [{ label: 'Otomatik', url: player.video, hls: /\.m3u8/i.test(player.video) }] };
+      // "Jet Player" (Doeda): dosya adresleri oynatıcının kendi kaynak servisinden alınır.
+      const jet = /\/play\.php\?(?:.*&)?vid=([0-9a-z]+)/i.exec(player.embed);
+      if (jet) {
+        try {
+          const api = new URL('ajax_sources.php', player.embed).href;
+          let alternative = 'ankacdn';
+          for (let ord = 0; ord < 3; ord++) {
+            const res = parseJetSources(await net.text(api, { relay: true, method: 'POST', referer: player.embed,
+              form: { vid: jet[1], alternative, ord: String(ord) } }));
+            if (res.iframe) return { embed: res.iframe };
+            if (res.videos.length) return { videos: res.videos, fallback: player.embed };
+            if (!res.failed || !res.alternative) break;
+            alternative = res.alternative;
+          }
+        } catch { /* oynatıcı çerçevesine düş */ }
+      }
       return player;
     },
   };
 }
 
-export const DOEDA = { id: 'wp-doeda.com', name: 'Doeda', baseURL: 'http://www.doeda.com', lang: 'tr', hentaiOnly: false };
-export const DOEDA_ONE = { id: 'wp-doeda.one', name: 'Doeda One', baseURL: 'https://www.doeda.one', lang: 'tr', hentaiOnly: false };
+export const DOEDA = { id: 'wp-doeda.com', name: 'Doeda', baseURL: 'http://www.doeda.com', lang: 'tr' };
+export const DOEDA_ONE = { id: 'wp-doeda.one', name: 'Doeda One', baseURL: 'https://www.doeda.one', lang: 'tr' };
 
 /** Ayarlar'dan girilen alan adından site oluşturur. */
-export function customSite(name, address, lang = 'tr', hentaiOnly = false) {
+export function customSite(name, address, lang = 'tr') {
   let a = String(address || '').trim();
   if (!a) return null;
   if (!/^https?:/i.test(a)) a = 'https://' + a;
@@ -220,7 +274,7 @@ export function customSite(name, address, lang = 'tr', hentaiOnly = false) {
   let host;
   try { host = new URL(a).hostname.toLowerCase(); } catch { return null; }
   if (!host.includes('.')) return null;
-  return { id: `wp-${host}`, name: String(name || '').trim() || host, baseURL: a, lang, hentaiOnly };
+  return { id: `wp-${host}`, name: String(name || '').trim() || host, baseURL: a, lang };
 }
 
 export function builtInProviders() {

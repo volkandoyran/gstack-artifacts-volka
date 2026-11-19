@@ -7,7 +7,7 @@ export function createStore(storage) {
   };
   const write = (key, value) => { try { storage.setItem(key, JSON.stringify(value)); } catch { /* dolu / kapalı */ } };
 
-  const DEFAULTS = { ageConfirmed: false, dedupeLevel: 1, hideWatched: false, disabled: [], customSites: [], relayURL: '' };
+  const DEFAULTS = { ageConfirmed: false, dedupeLevel: 1, hideWatched: false, disabled: [], customSites: [], relayURL: '', unguarded: [] };
   const HISTORY_LIMIT = 4000, FAVORITE_LIMIT = 500;
 
   let history = read('vitrin.history', []);

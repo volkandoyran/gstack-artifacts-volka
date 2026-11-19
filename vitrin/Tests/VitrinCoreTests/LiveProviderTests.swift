@@ -13,11 +13,10 @@ final class LiveProviderTests: XCTestCase {
         var working = 0
 
         for p in ProviderRegistry.builtIn {
-            let kind: ContentKind = p.kinds.contains(.real) ? .real : .hentai
-            let term = kind == .hentai ? "uncensored" : (p.language == .tr ? "masaj" : "massage")
+            let term = p.language == .tr ? "masaj" : "massage"
             var searchCell = "", playCell = "—"
             do {
-                let list = try await p.search(SearchQuery(terms: [term], kind: kind, sort: .relevance, page: 1))
+                let list = try await p.search(SearchQuery(terms: [term], sort: .relevance, page: 1))
                 let timed = list.filter { $0.durationSec > 0 }.count
                 let thumbed = list.filter { $0.thumbnail != nil }.count
                 searchCell = "\(list.count) sonuç · süreli \(timed) · görselli \(thumbed)"

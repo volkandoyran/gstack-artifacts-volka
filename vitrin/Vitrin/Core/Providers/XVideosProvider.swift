@@ -40,18 +40,17 @@ struct XVideosProvider: ContentProvider {
     let site: Site
     var id: String { site.id }
     var displayName: String { site.name }
-    let kinds: Set<ContentKind> = [.real, .hentai]
     var nativeQuality: Bool { true }
 
     func search(_ q: SearchQuery) async throws -> [Video] {
-        guard let url = site.searchURL(effectiveTerms(q).joined(separator: " "), q.page, q.sort) else { return [] }
+        guard let url = site.searchURL(q.terms.joined(separator: " "), q.page, q.sort) else { return [] }
         let html = try await HTTP.text(url)
-        return Self.parseSearch(html: html, site: site, kind: q.kind)
+        return Self.parseSearch(html: html, site: site)
     }
 
     // MARK: Arama sayfası
 
-    static func parseSearch(html: String, site: Site, kind: ContentKind) -> [Video] {
+    static func parseSearch(html: String, site: Site) -> [Video] {
         let starts = Rx.ranges(#"<div[^>]*\bid="video_[^"]*"[^>]*>"#, in: html)
         var out: [Video] = []
         for (i, r) in starts.enumerated() {
@@ -84,7 +83,7 @@ struct XVideosProvider: ContentProvider {
             let height = Int(Rx.first(#">\s*(\d{3,4})p\s*<"#, in: block)?[1] ?? "")
 
             out.append(Video(
-                providerID: site.id, remoteID: numericID, kind: kind, title: title,
+                providerID: site.id, remoteID: numericID, title: title,
                 thumbnail: thumb.flatMap { URL(string: $0.htmlDecoded) },
                 durationSec: duration,
                 views: viewsText.map(Fmt.count(fromCompact:)) ?? 0,

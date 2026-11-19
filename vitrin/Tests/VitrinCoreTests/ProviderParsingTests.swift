@@ -16,7 +16,7 @@ final class ProviderParsingTests: XCTestCase {
            "thumbs":[]}]}
         """#
         let r = try JSONDecoder().decode(EpornerProvider.Response.self, from: Data(json.utf8))
-        let v = try XCTUnwrap(EpornerProvider.videos(from: r, kind: .real).first)
+        let v = try XCTUnwrap(EpornerProvider.videos(from: r).first)
         XCTAssertEqual(v.id, "eporner:27zf5ImSu7z")
         XCTAssertEqual(v.durationSec, 1291)
         XCTAssertEqual(v.views, 285)
@@ -39,7 +39,7 @@ final class ProviderParsingTests: XCTestCase {
           "tags":[{"tag_name":"pov"},{"tag_name":"massage"}],"pornstars":[],"categories":[{"category":"amateur"}],
           "segment":"straight"}]}
         """#
-        let list = try WebmasterAPI.videos(from: Data(json.utf8), provider: "pornhub", kind: .real) {
+        let list = try WebmasterAPI.videos(from: Data(json.utf8), provider: "pornhub") {
             URL(string: "https://www.pornhub.com/embed/\($0)")
         }
         let v = try XCTUnwrap(list.first)
@@ -60,7 +60,7 @@ final class ProviderParsingTests: XCTestCase {
           "thumbs":[{"size":"medium","width":180,"height":135,"src":"https://ei/x.jpg"}],
           "tags":[{"tag_name":"HD"},{"tag_name":"amateur"}]}}],"count":1}
         """#
-        let list = try WebmasterAPI.videos(from: Data(json.utf8), provider: "redtube", kind: .real) { _ in nil }
+        let list = try WebmasterAPI.videos(from: Data(json.utf8), provider: "redtube") { _ in nil }
         let v = try XCTUnwrap(list.first)
         XCTAssertEqual(v.id, "redtube:309411291")
         XCTAssertEqual(v.durationSec, 21)
@@ -76,7 +76,7 @@ final class ProviderParsingTests: XCTestCase {
         <div id="video_abc123" data-id="555" data-eid="abc123" class="frame-block thumb-block"><div class="thumb"><a href="https://www.xvideos.com/video.abc123/second_one"><img src="https://thumb.example/2.jpg"></a></div><p class="title"><a href="https://www.xvideos.com/video.abc123/second_one" title="Second one">Second one <span class="duration">1 h 5 min</span></a></p><p class="metadata"><span class="duration">1 h 5 min</span> 18.5k <span class="sprfluous">Views</span></p></div>
         </div>
         """#
-        let list = XVideosProvider.parseSearch(html: html, site: .xvideos, kind: .real)
+        let list = XVideosProvider.parseSearch(html: html, site: .xvideos)
         XCTAssertEqual(list.count, 2)
         let a = list[0]
         XCTAssertEqual(a.id, "xvideos:83000781")
@@ -96,7 +96,7 @@ final class ProviderParsingTests: XCTestCase {
         let html = #"""
         <div id="video_1fdwvt5f" data-id="86309561" data-eid="1fdwvt5f" class="thumb-block with-uploader"><div class="thumb-inside"><div class="thumb"><a href="https://www.xnxx.com/video-1fdwvt5f/sample_title"><img src="https://thumb-cdn77.xnxx-cdn.com/fe8c/0/xn_14_t.jpg" data-videoid="86309561" id="pic_86309561"></a></div></div><div class="uploader"><a href="https://www.xnxx.com/porn-maker/x"><span class="name">Studio 24h</span></a></div><div class="thumb-under"><p><a href="https://www.xnxx.com/video-1fdwvt5f/sample_title" title="Sample Title's Surprise">Sample Title's Surprise</a></p><p class="metadata"><span class="right"> 876.1k <span class="icon-f icf-eye"></span><span class="superfluous">100%</span></span> 6min <span class="video-hd"><span class="superfluous"> - </span> 720p </span></p></div></div>
         """#
-        let v = try XCTUnwrap(XVideosProvider.parseSearch(html: html, site: .xnxx, kind: .real).first)
+        let v = try XCTUnwrap(XVideosProvider.parseSearch(html: html, site: .xnxx).first)
         XCTAssertEqual(v.id, "xnxx:86309561")
         XCTAssertEqual(v.title, "Sample Title's Surprise")
         XCTAssertEqual(v.durationSec, 360)
@@ -145,7 +145,7 @@ final class ProviderParsingTests: XCTestCase {
          {"id":7,"date_gmt":"2026-11-02T11:40:33","link":"https:\/\/ornek.com\/b\/","title":{"rendered":"Görselsiz yazı"},
           "featured_media":0,"meta":[],"_embedded":{"wp:featuredmedia":[{"code":"rest_post_invalid_id","message":"x","data":{"status":404}}]}}]
         """#
-        let list = try WordPressProvider.videos(from: Data(json.utf8), site: .doeda, kind: .real)
+        let list = try WordPressProvider.videos(from: Data(json.utf8), site: .doeda)
         XCTAssertEqual(list.count, 2)
         let v = list[0]
         XCTAssertEqual(v.id, "wp-doeda.com:65392")
@@ -162,13 +162,12 @@ final class ProviderParsingTests: XCTestCase {
 
     func testWordPressSearchURL() {
         let p = WordPressProvider(site: .doeda)
-        let url = p.searchURL(SearchQuery(terms: ["masaj", "sarışın"], kind: .real, sort: .newest, page: 2))
+        let url = p.searchURL(SearchQuery(terms: ["masaj", "sarışın"], sort: .newest, page: 2))
         let s = url?.absoluteString ?? ""
         XCTAssertTrue(s.hasPrefix("http://www.doeda.com/wp-json/wp/v2/posts?"), s)
         XCTAssertTrue(s.contains("page=2") && s.contains("orderby=date") && s.contains("search=masaj%20sar"), s)
-        // Hentai aramasında terimin başına "hentai" eklenir
-        let h = p.searchURL(SearchQuery(terms: ["elf"], kind: .hentai, sort: .relevance, page: 1))?.absoluteString ?? ""
-        XCTAssertTrue(h.contains("search=hentai%20elf") && h.contains("orderby=relevance"), h)
+        let r = p.searchURL(SearchQuery(terms: ["masaj"], sort: .relevance, page: 1))?.absoluteString ?? ""
+        XCTAssertTrue(r.contains("search=masaj&") && r.contains("orderby=relevance") && !r.contains("hentai"), r)
     }
 
     func testFindPlayerVariants() throws {
@@ -213,12 +212,12 @@ final class ProviderParsingTests: XCTestCase {
     }
 
     func testCustomSite() {
-        let s = WordPressSite.custom(name: "", address: " ornek-site.com/ ", language: .tr, hentaiOnly: false)
+        let s = WordPressSite.custom(name: "", address: " ornek-site.com/ ", language: .tr)
         XCTAssertEqual(s?.baseURL, "https://ornek-site.com")
         XCTAssertEqual(s?.id, "wp-ornek-site.com")
         XCTAssertEqual(s?.name, "ornek-site.com")
-        XCTAssertNil(WordPressSite.custom(name: "x", address: "bozuk", language: .tr, hentaiOnly: false))
-        XCTAssertEqual(WordPressSite.custom(name: "A", address: "http://a.b.com", language: .en, hentaiOnly: true)?.baseURL, "http://a.b.com")
+        XCTAssertNil(WordPressSite.custom(name: "x", address: "bozuk", language: .tr))
+        XCTAssertEqual(WordPressSite.custom(name: "A", address: "http://a.b.com", language: .en)?.baseURL, "http://a.b.com")
     }
 
     // MARK: HLS

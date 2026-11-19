@@ -1,8 +1,7 @@
 // Kategoriler, sıralama ölçütleri ve TR <-> EN etiket sözlüğü.
 import { asciiFold, wordTokens } from './text.js';
 
-const r = (title, en, tr) => ({ id: `r-${en}`, title, term: en, termTR: tr ?? title.toLowerCase(), kind: 'real' });
-const h = (title, en, tr) => ({ id: `h-${en}`, title, term: en, termTR: tr ?? title.toLowerCase(), kind: 'hentai' });
+const r = (title, en, tr) => ({ id: `r-${en}`, title, term: en, termTR: tr ?? title.toLowerCase() });
 
 export const CATEGORIES = [
   r('Türk', 'turkish', 'türk'), r('Türkçe altyazılı', 'turkish subtitles', 'türkçe altyazılı'),
@@ -15,13 +14,6 @@ export const CATEGORIES = [
   r('Dış mekan', 'outdoor', 'dışarıda'), r('Çift', 'couple', 'çift'), r('Romantik', 'romantic', 'romantik'),
   r('Sert', 'rough', 'sert'), r('Solo', 'solo', 'mastürbasyon'), r('Konulu', 'story', 'konulu'),
   r('4K', '4k', 'full hd'),
-  h('Sansürsüz', 'uncensored', 'sansürsüz'), h('Vanilla', 'vanilla', 'vanilla'),
-  h('Romantik', 'romance', 'romantik'), h('Komedi', 'comedy', 'komedi'),
-  h('Fantastik', 'fantasy', 'fantastik'), h('Büyük göğüs', 'big boobs', 'büyük memeli'),
-  h('Olgun', 'milf', 'olgun'), h('Hizmetçi', 'maid', 'hizmetçi'), h('Hemşire', 'nurse', 'hemşire'),
-  h('Elf', 'elf', 'elf'), h('Harem', 'harem', 'harem'), h('Yuri', 'yuri', 'yuri'),
-  h('Dokunaç', 'tentacle', 'tentacle'), h('Ahegao', 'ahegao', 'ahegao'), h('NTR', 'ntr', 'ntr'),
-  h('3D', '3d', '3d'), h('Canavar kız', 'monster girl', 'canavar'), h('Bikini', 'swimsuit', 'bikini'),
 ];
 
 export const SORTS = [
@@ -34,13 +26,13 @@ export const SORTS = [
 const PAIRS = [
   ['türkçe altyazılı', 'turkish subtitles'], ['büyük göğüs', 'big tits'], ['büyük memeli', 'big tits'],
   ['ev yapımı', 'homemade'], ['dış mekan', 'outdoor'], ['gizli çekim', 'hidden cam'],
-  ['canavar kız', 'monster girl'], ['üvey anne', 'stepmom'], ['üvey kardeş', 'stepsister'],
+  ['üvey anne', 'stepmom'], ['üvey kardeş', 'stepsister'],
   ['sarışın', 'blonde'], ['esmer', 'brunette'], ['kızıl', 'redhead'], ['olgun', 'milf'],
   ['amatör', 'amateur'], ['türk', 'turkish'], ['asyalı', 'asian'], ['japon', 'japanese'],
   ['koreli', 'korean'], ['rus', 'russian'], ['latin', 'latina'], ['zenci', 'ebony'], ['siyahi', 'ebony'],
   ['lezbiyen', 'lesbian'], ['üçlü', 'threesome'], ['grup', 'group'], ['masaj', 'massage'],
   ['çift', 'couple'], ['romantik', 'romantic'], ['sert', 'rough'], ['oral', 'blowjob'],
-  ['hemşire', 'nurse'], ['hizmetçi', 'maid'], ['dokunaç', 'tentacle'], ['sansürsüz', 'uncensored'],
+  ['hemşire', 'nurse'], ['hizmetçi', 'maid'], ['sansürsüz', 'uncensored'],
   ['komedi', 'comedy'], ['fantastik', 'fantasy'], ['sekreter', 'secretary'], ['öğretmen', 'teacher'],
   ['duş', 'shower'], ['plaj', 'beach'], ['dövmeli', 'tattoo'], ['şişman', 'bbw'], ['tombul', 'chubby'],
   ['zayıf', 'skinny'], ['dışarıda', 'outdoor'], ['ofis', 'office'], ['konulu', 'story'],

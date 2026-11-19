@@ -92,7 +92,7 @@ function renderMain() {
   if (!root) return;
   const showFav = ui.view === 'favorites';
   const list = showFav ? store.favorites : S.videos;
-  const cats = CATEGORIES.filter((c) => S.kindFilter === 'all' || c.kind === S.kindFilter);
+  const cats = CATEGORIES;
 
   // Yeniden çizimde yazılmakta olan aramayı, odağı ve kategori şeridinin kaydırmasını koru.
   const oldInput = root.querySelector('input[name=q]');
@@ -125,12 +125,9 @@ function renderMain() {
     !showFav && h('form', { class: 'search', onsubmit: (e) => { e.preventDefault(); S.freeText = e.target.q.value; e.target.q.blur(); browser.refresh(); } },
       h('input', { name: 'q', type: 'search', value: draft, placeholder: 'Ara (Türkçe ya da İngilizce)', autocomplete: 'off', enterkeyhint: 'search' })),
 
-    !showFav && h('div', { class: 'seg' }, [['all', 'Hepsi'], ['real', 'Gerçek'], ['hentai', 'Hentai']].map(([id, label]) =>
-      h('button', { type: 'button', class: S.kindFilter === id ? 'on' : '', onclick: () => { S.kindFilter = id; browser.refresh(); } }, label))),
-
     !showFav && h('div', { class: 'chips' },
       S.selected.size > 0 && chip('✕ Temizle', false, () => { S.selected.clear(); browser.refresh(); }, 'clear'),
-      cats.map((c) => chip((S.kindFilter === 'all' && c.kind === 'hentai' ? '✦ ' : '') + c.title, S.selected.has(c.id), () => {
+      cats.map((c) => chip(c.title, S.selected.has(c.id), () => {
         S.selected.has(c.id) ? S.selected.delete(c.id) : S.selected.add(c.id);
         browser.refresh();
       }))),
@@ -179,28 +176,57 @@ const scrollWatcher = new IntersectionObserver((entries) => {
 
 async function openPlayer(video) {
   const sources = [video].concat(S.alternates.get(video.id) || []);
-  ui.player = { video, sources, current: video, status: 'loading', source: null, error: null, guarded: true };
+  ui.player = { video, sources, current: video, status: 'loading', source: null, error: null, guarded: true, variant: 0 };
   renderPlayer();
   await loadPlayback();
+}
+
+const unguardedSites = () => store.settings.unguarded || [];
+
+/** Bu tarayıcının oynatabileceği akışlar (iPhone'da HLS dahil), en iyisi başta. */
+function playableVariants(videos) {
+  const probe = document.createElement('video');
+  const hls = !!probe.canPlayType('application/vnd.apple.mpegurl');
+  return (videos || []).filter((v) => !v.hls || hls);
 }
 
 async function loadPlayback() {
   const p = ui.player;
   if (!p) return;
   const target = p.current;
-  Object.assign(p, { status: 'loading', source: null, error: null, guarded: true });
+  Object.assign(p, { status: 'loading', source: null, error: null, note: null, variant: 0, resumeAt: 0,
+    guarded: !unguardedSites().includes(target.providerID) });
   renderPlayer();
   try {
     const provider = getProviders().find((x) => x.id === target.providerID);
     if (!provider) throw new Error('Kaynak bulunamadı.');
-    const source = await provider.playback(target, net);
+    let source = await provider.playback(target, net);
     if (ui.player !== p || p.current !== target) return;
-    if (!source || (!source.embed && !source.video)) throw new Error('Oynatılabilir kaynak bulunamadı.');
+    if (source?.videos) {
+      const videos = playableVariants(source.videos);
+      source = videos.length ? { ...source, videos } : source.fallback ? { embed: source.fallback } : null;
+    }
+    if (!source || (!source.embed && !source.videos)) throw new Error('Oynatılabilir kaynak bulunamadı.');
     Object.assign(p, { status: 'ready', source });
     store.markWatched(p.video);   // "İzlediklerimi gizle" için
   } catch (e) {
     if (ui.player !== p || p.current !== target) return;
     Object.assign(p, { status: 'failed', error: describeError(e) });
+  }
+  renderPlayer();
+}
+
+/** Doğrudan akış açılamadı: sonraki kaliteyi, o da yoksa sitenin gömülü oynatıcısını dene. */
+function onVideoError(p) {
+  if (ui.player !== p || !p.source?.videos) return;
+  if (p.variant + 1 < p.source.videos.length) {
+    p.variant++;
+    p.note = 'Bu kalite açılamadı, bir sonrakine geçildi.';
+  } else if (p.source.fallback) {
+    p.source = { embed: p.source.fallback };
+    p.note = 'Video doğrudan açılamadı; sitenin oynatıcısına geçildi.';
+  } else {
+    Object.assign(p, { status: 'failed', error: 'Video açılamadı. Site engelliyse VPN/DNS açıkken tekrar dene.' });
   }
   renderPlayer();
 }
@@ -213,15 +239,60 @@ function playerFrame(p) {
       p.sources.filter((s) => s !== p.current).map((s) =>
         h('button', { class: 'btn', type: 'button', onclick: () => { p.current = s; loadPlayback(); } }, `${providerName(s.providerID)} kaynağını dene`))));
   }
-  if (p.source.video) {
-    return h('div', { class: 'frame' }, h('video', { src: p.source.video, controls: true, playsinline: true, autoplay: true, referrerpolicy: 'no-referrer' }));
+  if (p.source.videos) {
+    const variant = p.source.videos[p.variant];
+    const el = h('video', { src: variant.url, controls: true, playsinline: true, autoplay: true, preload: 'auto',
+      referrerpolicy: 'no-referrer', onerror: () => onVideoError(p) });
+    if (p.resumeAt > 0) el.addEventListener('loadedmetadata', () => { el.currentTime = p.resumeAt; }, { once: true });
+    return h('div', { class: 'frame' }, el);
   }
   // Korumalı çerçeve: site açılmaz; yeni pencere ve üst sayfayı değiştirme izni verilmez.
+  // Bazı oynatıcılar korumalı çerçevede çalışmaz; kullanıcı o site için korumasız modu seçebilir.
   return h('div', { class: 'frame' }, h('iframe', {
-    src: p.source.embed, title: 'Oynatıcı', referrerpolicy: 'no-referrer', allowfullscreen: true,
+    src: p.source.embed, title: 'Oynatıcı', referrerpolicy: 'origin', allowfullscreen: true,
     allow: 'autoplay; fullscreen; encrypted-media; picture-in-picture',
-    sandbox: p.guarded ? 'allow-scripts allow-same-origin allow-presentation' : null,
+    sandbox: p.guarded ? 'allow-scripts allow-same-origin allow-presentation allow-forms' : null,
   }));
+}
+
+function setGuarded(p, guarded) {
+  const list = new Set(unguardedSites());
+  guarded ? list.delete(p.current.providerID) : list.add(p.current.providerID);
+  store.update({ unguarded: [...list] });
+  p.guarded = guarded;
+  renderPlayer();
+}
+
+function playerNotes(p) {
+  if (p.status !== 'ready') return null;
+  const out = [];
+  if (p.note) out.push(h('p', { class: 'note' }, p.note));
+  if (p.source.videos) {
+    out.push(h('p', { class: 'note' }, 'Video telefonun kendi oynatıcısında açılıyor; site açılmaz.'));
+    if (p.source.videos.length > 1) {
+      out.push(h('label', { class: 'row' }, h('span', { class: 'grow' }, 'Kalite'),
+        h('select', { onchange: (e) => {
+          const video = $('player').querySelector('video');
+          p.resumeAt = video ? video.currentTime : 0;
+          p.variant = Number(e.target.value);
+          p.note = null;
+          renderPlayer();
+        } }, p.source.videos.map((v, i) => h('option', { value: i, selected: i === p.variant }, v.label)))));
+    }
+    if (p.source.fallback) {
+      out.push(h('button', { class: 'link', type: 'button', onclick: () => {
+        p.source = { embed: p.source.fallback }; p.note = null; renderPlayer();
+      } }, 'Açılmıyorsa sitenin oynatıcısıyla aç'));
+    }
+  } else {
+    out.push(h('p', { class: 'note' }, p.guarded
+      ? 'Kaliteyi oynatıcıdaki ⚙ menüsünden seç. Site açılmaz; çıkış linkleri ve açılır pencereler engelli. '
+      : 'Korumasız mod (bu site için hatırlanır): oynatıcı açılır pencere açabilir. ',
+      p.guarded
+        ? h('button', { class: 'link', type: 'button', onclick: () => setGuarded(p, false) }, 'Video açılmadıysa korumasız dene')
+        : h('button', { class: 'link', type: 'button', onclick: () => setGuarded(p, true) }, 'Korumalı moda dön')));
+  }
+  return out;
 }
 
 function renderPlayer() {
@@ -246,10 +317,7 @@ function renderPlayer() {
         onclick: () => { store.toggleFavorite(p.video); renderPlayer(); redrawGrid(); } }, '★')),
     playerFrame(p),
     h('div', { class: 'sheet-body' },
-      p.status === 'ready' && p.source.embed && h('p', { class: 'note' }, p.guarded
-        ? 'Kaliteyi oynatıcıdaki ⚙ menüsünden seç. Site açılmaz; çıkış linkleri ve açılır pencereler engelli. '
-        : 'Korumasız mod: oynatıcı açılır pencere açabilir. ',
-        p.guarded && h('button', { class: 'link', type: 'button', onclick: () => { p.guarded = false; renderPlayer(); } }, 'Oynatıcı açılmadıysa korumasız dene')),
+      playerNotes(p),
       p.sources.length > 1 && h('label', { class: 'row' }, `Kaynak (${p.sources.length} sitede var): `,
         h('select', { onchange: (e) => { p.current = p.sources[Number(e.target.value)]; loadPlayback(); } },
           p.sources.map((s, i) => h('option', { value: i, selected: s === p.current }, providerName(s.providerID))))),
@@ -302,7 +370,7 @@ function renderSettings() {
       h('form', { class: 'stack', onsubmit: (e) => {
         e.preventDefault();
         const f = e.target;
-        const site = customSite(f.name.value, f.address.value, f.lang.value, f.hentai.checked);
+        const site = customSite(f.name.value, f.address.value, f.lang.value);
         const msg = !site ? 'Alan adı geçersiz görünüyor.' : getProviders().some((p) => p.id === site.id) ? 'Bu site zaten ekli.' : null;
         if (msg) { f.querySelector('.err').textContent = msg; return; }
         store.update({ customSites: store.settings.customSites.concat([site]) });
@@ -312,7 +380,6 @@ function renderSettings() {
         h('input', { name: 'address', placeholder: 'Alan adı — örn. ornek.com', autocomplete: 'off', autocapitalize: 'none', inputmode: 'url' }),
         h('label', { class: 'row' }, h('span', { class: 'grow' }, 'Arama dili'),
           h('select', { name: 'lang' }, h('option', { value: 'tr' }, 'Türkçe'), h('option', { value: 'en' }, 'İngilizce'))),
-        h('label', { class: 'row' }, h('span', { class: 'grow' }, 'Sadece hentai sitesi'), h('input', { type: 'checkbox', name: 'hentai' })),
         h('button', { class: 'btn', type: 'submit' }, 'Siteyi ekle'),
         h('p', { class: 'err' })),
 

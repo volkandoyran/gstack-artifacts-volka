@@ -14,23 +14,37 @@ enum SafetyFilter {
         // Hayvan içeren içerik
         #"\b(bestiality|zoophil\w*|zoo ?porn|hayvanla)\b"#,
     ]
-    /// Çizim içerikte okul teması çoğunlukla reşit olmayan karakter demektir.
-    private static let hentaiOnly = [
-        #"\b(school ?girl\w*|school ?boy\w*|high ?school\w*|middle ?school\w*|okullu\w*)\b"#,
-    ]
-
-    static func isBlocked(_ text: String, kind: ContentKind? = nil) -> Bool {
+    static func isBlocked(_ text: String) -> Bool {
         let t = text.asciiFolded
-        let patterns = kind == .hentai ? always + hentaiOnly : always
-        return patterns.contains { Rx.first($0, in: t) != nil }
+        return always.contains { Rx.first($0, in: t) != nil }
     }
 
     static func isAllowed(_ v: Video) -> Bool {
-        !isBlocked(v.title, kind: v.kind) && !v.tags.contains { isBlocked($0, kind: v.kind) }
+        !isBlocked(v.title) && !v.tags.contains(where: isBlocked)
     }
 
     static func sanitize(_ terms: [String]) -> [String] {
-        terms.filter { !isBlocked($0, kind: .hentai) }
+        terms.filter { !isBlocked($0) }
+    }
+}
+
+/// Uygulama yalnızca gerçek (çizim olmayan) videoları gösterir: hentai / animasyon / çizgi
+/// etiketli sonuçlar gerçek video sitelerinden gelse bile listeden çıkarılır.
+enum AnimatedFilter {
+    private static let pattern =
+        #"\b(hentai\w*|anime|animated|animation|cartoons?|toons?|manga|doujin\w*|animasyon\w*|cizgi film\w*|cizgi)\b"#
+
+    static func isAnimated(_ text: String) -> Bool {
+        Rx.first(pattern, in: text.asciiFolded) != nil
+    }
+
+    static func isAnimated(_ v: Video) -> Bool {
+        isAnimated(v.title) || v.tags.contains(where: isAnimated)
+    }
+
+    /// Arama terimlerinden çizim içeriği arayanları çıkarır.
+    static func sanitize(_ terms: [String]) -> [String] {
+        terms.filter { !isAnimated($0) }
     }
 }
 

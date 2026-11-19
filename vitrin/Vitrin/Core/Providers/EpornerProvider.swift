@@ -5,7 +5,6 @@ import Foundation
 struct EpornerProvider: ContentProvider {
     let id = "eporner"
     let displayName = "Eporner"
-    let kinds: Set<ContentKind> = [.real, .hentai]
 
     struct Response: Decodable { let videos: [Item] }
     struct Item: Decodable {
@@ -32,7 +31,7 @@ struct EpornerProvider: ContentProvider {
         case .shortest: order = "shortest"
         case .relevance: order = "most-popular"
         }
-        let terms = effectiveTerms(q).joined(separator: " ")
+        let terms = q.terms.joined(separator: " ")
         var c = URLComponents(string: "https://www.eporner.com/api/v2/video/search/")!
         c.queryItems = [
             .init(name: "query", value: terms.isEmpty ? "all" : terms),
@@ -45,13 +44,13 @@ struct EpornerProvider: ContentProvider {
             .init(name: "format", value: "json"),
         ]
         let r = try await HTTP.get(c.url!, as: Response.self)
-        return Self.videos(from: r, kind: q.kind)
+        return Self.videos(from: r)
     }
 
-    static func videos(from r: Response, kind: ContentKind) -> [Video] {
+    static func videos(from r: Response) -> [Video] {
         r.videos.map { v in
             Video(
-                providerID: "eporner", remoteID: v.id, kind: kind, title: v.title,
+                providerID: "eporner", remoteID: v.id, title: v.title,
                 thumbnail: v.default_thumb.flatMap { URL(string: $0.src) },
                 durationSec: Int(v.length_sec?.value ?? 0),
                 views: Int(v.views?.value ?? 0),

@@ -49,56 +49,39 @@ final class AIReplyParsingTests: XCTestCase {
 }
 
 final class SearchPlannerTests: XCTestCase {
-    /// Yalnızca hentai içeren, kullanıcının eklediği bir site
-    private static let hentaiSite = WordPressSite(id: "wp-h.example", name: "H", baseURL: "https://h.example",
-                                                  language: .en, hentaiOnly: true)
-    private let providers: [any ContentProvider] = [
-        EpornerProvider(), WordPressProvider(site: hentaiSite), WordPressProvider(site: .doeda),
-    ]
+    private let providers: [any ContentProvider] = [EpornerProvider(), WordPressProvider(site: .doeda)]
     private func cat(_ id: String) -> AppCategory { CategoryCatalog.all.first { $0.id == id }! }
 
     func testAndModeSendsOneQueryPerSiteInItsLanguage() {
-        let jobs = SearchPlanner.jobs(providers: providers, kindFilter: .real,
-                                      selected: [cat("r-blonde"), cat("r-massage")],
+        let jobs = SearchPlanner.jobs(providers: providers, selected: [cat("r-blonde"), cat("r-massage")],
                                       free: TagTranslator.bilingual("ofis"), combine: .all, sort: .newest, page: 1)
-        XCTAssertEqual(jobs.count, 2)   // üçüncü site sadece hentai
+        XCTAssertEqual(jobs.count, 2)
         XCTAssertEqual(jobs.first { $0.provider.id == "eporner" }?.query.terms, ["blonde", "massage", "office"])
         XCTAssertEqual(jobs.first { $0.provider.id == "wp-doeda.com" }?.query.terms, ["sarışın", "masaj", "ofis"])
     }
 
     func testOrModeSendsOneQueryPerCategory() {
-        let jobs = SearchPlanner.jobs(providers: [EpornerProvider()], kindFilter: .all,
-                                      selected: [cat("r-blonde"), cat("r-massage")],
+        let jobs = SearchPlanner.jobs(providers: [EpornerProvider()], selected: [cat("r-blonde"), cat("r-massage")],
                                       free: BilingualTerms(en: [], tr: []), combine: .any, sort: .relevance, page: 2)
         XCTAssertEqual(jobs.map(\.query.terms), [["blonde"], ["massage"]])
-        XCTAssertTrue(jobs.allSatisfy { $0.query.kind == .real && $0.query.page == 2 })
-    }
-
-    func testMixedKindsSearchEachKindWithItsOwnCategories() {
-        let jobs = SearchPlanner.jobs(providers: providers, kindFilter: .all,
-                                      selected: [cat("r-blonde"), cat("h-elf")],
-                                      free: BilingualTerms(en: [], tr: []), combine: .all, sort: .relevance, page: 1)
-        let summary = Set(jobs.map { "\($0.provider.id)|\($0.query.kind.rawValue)|\($0.query.terms.joined(separator: "+"))" })
-        XCTAssertEqual(summary, [
-            "eporner|real|blonde", "wp-doeda.com|real|sarışın",
-            "eporner|hentai|elf", "wp-h.example|hentai|elf", "wp-doeda.com|hentai|elf",
-        ])
-        // Karma sitelerde hentai sorgusuna "hentai" eklenir; yalnızca hentai olan sitede eklenmez.
-        let q = SearchQuery(terms: ["elf"], kind: .hentai, sort: .relevance, page: 1)
-        XCTAssertEqual(EpornerProvider().effectiveTerms(q), ["hentai", "elf"])
-        XCTAssertEqual(WordPressProvider(site: Self.hentaiSite).effectiveTerms(q), ["elf"])
+        XCTAssertTrue(jobs.allSatisfy { $0.query.page == 2 })
     }
 
     func testNoSelectionBrowsesEverything() {
-        let jobs = SearchPlanner.jobs(providers: providers, kindFilter: .all, selected: [],
+        let jobs = SearchPlanner.jobs(providers: providers, selected: [],
                                       free: BilingualTerms(en: [], tr: []), combine: .all, sort: .relevance, page: 1)
-        XCTAssertEqual(jobs.count, 5)
+        XCTAssertEqual(jobs.count, 2)
         XCTAssertTrue(jobs.allSatisfy { $0.query.terms.isEmpty })
+    }
+
+    func testCatalogHasNoAnimatedCategories() {
+        XCTAssertFalse(CategoryCatalog.all.contains { AnimatedFilter.isAnimated($0.title) || AnimatedFilter.isAnimated($0.term) })
+        XCTAssertTrue(CategoryCatalog.all.allSatisfy { $0.id.hasPrefix("r-") })
     }
 
     func testInterleaveAndSort() {
         func v(_ p: String, _ id: String, d: Int, views: Int) -> Video {
-            Video(providerID: p, remoteID: id, kind: .real, title: id, durationSec: d, views: views)
+            Video(providerID: p, remoteID: id, title: id, durationSec: d, views: views)
         }
         let a = [v("a", "1", d: 100, views: 5), v("a", "2", d: 0, views: 9)]
         let b = [v("b", "3", d: 50, views: 7)]

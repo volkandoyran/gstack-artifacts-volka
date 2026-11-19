@@ -8,31 +8,24 @@ struct SearchJob: Sendable {
 
 /// Seçimlere göre hangi siteye hangi sorgunun gideceğini belirler (saf fonksiyonlar; test edilebilir).
 enum SearchPlanner {
-    static func jobs(providers: [any ContentProvider], kindFilter: KindFilter, selected: [AppCategory],
+    static func jobs(providers: [any ContentProvider], selected: [AppCategory],
                      free: BilingualTerms, combine: CombineMode, sort: SortOption, page: Int) -> [SearchJob] {
         var jobs: [SearchJob] = []
-        for kind in ContentKind.allCases where kindFilter.includes(kind) {
-            let categories = selected.filter { $0.kind == kind }
-            // Sadece diğer türden kategori seçildiyse bu türü atla.
-            if categories.isEmpty && !selected.isEmpty { continue }
+        for provider in providers {
+            let lang = provider.language
+            let extra = free.terms(for: lang)
+            let terms = selected.map { $0.term(for: lang) }
 
-            for provider in providers where provider.kinds.contains(kind) {
-                let lang = provider.language
-                let extra = free.terms(for: lang)
-                let terms = categories.map { $0.term(for: lang) }
-
-                let termSets: [[String]]
-                if terms.isEmpty {
-                    termSets = [extra]
-                } else if combine == .all {
-                    termSets = [terms + extra]          // VE: tek sorgu, tüm terimler
-                } else {
-                    termSets = terms.map { [$0] + extra }  // VEYA: her kategori ayrı sorgu
-                }
-                for set in termSets {
-                    jobs.append(SearchJob(provider: provider,
-                                          query: SearchQuery(terms: set, kind: kind, sort: sort, page: page)))
-                }
+            let termSets: [[String]]
+            if terms.isEmpty {
+                termSets = [extra]
+            } else if combine == .all {
+                termSets = [terms + extra]          // VE: tek sorgu, tüm terimler
+            } else {
+                termSets = terms.map { [$0] + extra }  // VEYA: her kategori ayrı sorgu
+            }
+            for set in termSets {
+                jobs.append(SearchJob(provider: provider, query: SearchQuery(terms: set, sort: sort, page: page)))
             }
         }
         return jobs
@@ -86,7 +79,6 @@ enum FilterSettings {
 @MainActor
 @Observable
 final class BrowseModel {
-    var kindFilter: KindFilter = .all
     var selected: Set<String> = []
     var freeText = ""
     var combine: CombineMode = .all
@@ -114,7 +106,7 @@ final class BrowseModel {
     private var emptyStreak = 0
 
     var visibleCategories: [AppCategory] {
-        CategoryCatalog.all.filter { kindFilter.includes($0.kind) }
+        CategoryCatalog.all
     }
 
     func toggle(_ c: AppCategory) {
@@ -167,7 +159,8 @@ final class BrowseModel {
         guard !text.isEmpty else { return BilingualTerms(en: [], tr: []) }
         if let ai = aiTerms, ai.text == freeText { return ai.terms }
         let t = TagTranslator.bilingual(text)
-        return BilingualTerms(en: SafetyFilter.sanitize(t.en), tr: SafetyFilter.sanitize(t.tr))
+        return BilingualTerms(en: AnimatedFilter.sanitize(SafetyFilter.sanitize(t.en)),
+                              tr: AnimatedFilter.sanitize(SafetyFilter.sanitize(t.tr)))
     }
 
     private func load(generation gen: Int) async {
@@ -175,7 +168,7 @@ final class BrowseModel {
         defer { if gen == generation { isLoading = false } }
 
         let jobs = SearchPlanner.jobs(
-            providers: ProviderRegistry.enabled(), kindFilter: kindFilter,
+            providers: ProviderRegistry.enabled(),
             selected: CategoryCatalog.all.filter { selected.contains($0.id) },
             free: freeTerms(), combine: combine, sort: sort, page: page)
 
@@ -202,7 +195,7 @@ final class BrowseModel {
         // 1) güvenlik  2) aynı kimlik  3) izlenenler  4) yinelenenler  5) sıralama
         // Daha önce görülmemiş kimlikler. Hiç yenisi yoksa (site aynı sayfayı tekrar veriyorsa) liste bitmiştir.
         let fresh = SearchPlanner.interleave(buckets).filter { seen.insert($0.id).inserted }
-        var batch = fresh.filter(SafetyFilter.isAllowed)
+        var batch = fresh.filter { SafetyFilter.isAllowed($0) && !AnimatedFilter.isAnimated($0) }
         if FilterSettings.hideWatched {
             let before = batch.count
             batch.removeAll { WatchHistory.shared.isWatched($0) }

@@ -6,7 +6,6 @@ import Foundation
 protocol ContentProvider: Sendable {
     var id: String { get }
     var displayName: String { get }
-    var kinds: Set<ContentKind> { get }
     /// Arama terimlerinin dili (Türk siteleri için .tr)
     var language: Lang { get }
     /// Doğrudan akış verip uygulama içi kalite menüsünü destekliyor mu?
@@ -23,11 +22,6 @@ extension ContentProvider {
     func playback(for video: Video) async throws -> PlaybackSource {
         guard let url = video.embedURL else { throw HTTPError.empty }
         return .embed(url, referer: video.pageURL)
-    }
-
-    /// Karma sitelerde hentai aranırken "hentai" terimi eklenir.
-    func effectiveTerms(_ q: SearchQuery) -> [String] {
-        q.kind == .hentai && kinds.contains(.real) ? ["hentai"] + q.terms : q.terms
     }
 }
 

@@ -29,9 +29,9 @@ enum WebmasterAPI {
         let tags: [Tag]?
         struct Tag: Decodable { let tag_name: String }
 
-        func toVideo(provider: String, kind: ContentKind, embed: URL?) -> Video {
+        func toVideo(provider: String, embed: URL?) -> Video {
             Video(
-                providerID: provider, remoteID: video_id, kind: kind, title: title,
+                providerID: provider, remoteID: video_id, title: title,
                 thumbnail: URL(string: default_thumb ?? thumb ?? ""),
                 durationSec: Fmt.seconds(fromClock: duration),
                 views: Int(views?.value ?? 0),
@@ -52,27 +52,26 @@ enum WebmasterAPI {
         }
     }
 
-    static func videos(from data: Data, provider: String, kind: ContentKind, embed: (String) -> URL?) throws -> [Video] {
+    static func videos(from data: Data, provider: String, embed: (String) -> URL?) throws -> [Video] {
         let r = try JSONDecoder().decode(Response.self, from: data)
-        return (r.videos ?? []).map { $0.item.toVideo(provider: provider, kind: kind, embed: embed($0.item.video_id)) }
+        return (r.videos ?? []).map { $0.item.toVideo(provider: provider, embed: embed($0.item.video_id)) }
     }
 }
 
 struct PornhubProvider: ContentProvider {
     let id = "pornhub"
     let displayName = "Pornhub"
-    let kinds: Set<ContentKind> = [.real, .hentai]
 
     func search(_ q: SearchQuery) async throws -> [Video] {
         var c = URLComponents(string: "https://www.pornhub.com/webmasters/search")!
         c.queryItems = [
-            .init(name: "search", value: effectiveTerms(q).joined(separator: " ")),
+            .init(name: "search", value: q.terms.joined(separator: " ")),
             .init(name: "ordering", value: WebmasterAPI.ordering(q.sort)),
             .init(name: "page", value: "\(q.page)"),
             .init(name: "thumbsize", value: "large_hd"),
         ]
         let data = try await HTTP.data(c.url!)
-        return try WebmasterAPI.videos(from: data, provider: id, kind: q.kind) {
+        return try WebmasterAPI.videos(from: data, provider: id) {
             URL(string: "https://www.pornhub.com/embed/\($0)")
         }
     }
@@ -81,20 +80,19 @@ struct PornhubProvider: ContentProvider {
 struct RedTubeProvider: ContentProvider {
     let id = "redtube"
     let displayName = "RedTube"
-    let kinds: Set<ContentKind> = [.real, .hentai]
 
     func search(_ q: SearchQuery) async throws -> [Video] {
         var c = URLComponents(string: "https://api.redtube.com/")!
         c.queryItems = [
             .init(name: "data", value: "redtube.Videos.searchVideos"),
             .init(name: "output", value: "json"),
-            .init(name: "search", value: effectiveTerms(q).joined(separator: " ")),
+            .init(name: "search", value: q.terms.joined(separator: " ")),
             .init(name: "ordering", value: WebmasterAPI.ordering(q.sort)),
             .init(name: "page", value: "\(q.page)"),
             .init(name: "thumbsize", value: "big"),
         ]
         let data = try await HTTP.data(c.url!)
-        return try WebmasterAPI.videos(from: data, provider: id, kind: q.kind) {
+        return try WebmasterAPI.videos(from: data, provider: id) {
             URL(string: "https://embed.redtube.com/?id=\($0)")
         }
     }

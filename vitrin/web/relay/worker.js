@@ -10,6 +10,8 @@ import { buildSource } from './ipa.js';
 const BUILT_IN_HOSTS = [
   'www.pornhub.com', 'api.redtube.com', 'www.xvideos.com', 'www.xnxx.com', 'www.eporner.com',
   'www.doeda.com', 'doeda.com', 'doe.customcdn.org', 'www.doeda.one', 'doeda.one',
+  // Doeda'nın oynatıcısı (Jet Player): yalnızca video adreslerini veren kaynak servisi için
+  'www.canlitvnews3.xyz', 'canlitvnews3.xyz',
 ];
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const SECURITY = { 'X-Robots-Tag': 'noindex, nofollow, noarchive', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' };

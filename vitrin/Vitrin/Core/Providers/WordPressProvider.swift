@@ -7,15 +7,14 @@ struct WordPressSite: Codable, Identifiable, Hashable, Sendable {
     /// "https://www.ornek.com" (sonda / yok)
     var baseURL: String
     var language: Lang
-    var hentaiOnly: Bool
 
     static let doeda = WordPressSite(id: "wp-doeda.com", name: "Doeda", baseURL: "http://www.doeda.com",
-                                     language: .tr, hentaiOnly: false)
+                                     language: .tr)
     static let doedaOne = WordPressSite(id: "wp-doeda.one", name: "Doeda One", baseURL: "https://www.doeda.one",
-                                        language: .tr, hentaiOnly: false)
+                                        language: .tr)
 
     /// Ayarlar'dan girilen alan adından site oluşturur ("ornek.com", "https://ornek.com/" ...).
-    static func custom(name: String, address: String, language: Lang, hentaiOnly: Bool) -> WordPressSite? {
+    static func custom(name: String, address: String, language: Lang) -> WordPressSite? {
         var a = address.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !a.isEmpty else { return nil }
         if !a.lowercased().hasPrefix("http") { a = "https://" + a }
@@ -23,7 +22,7 @@ struct WordPressSite: Codable, Identifiable, Hashable, Sendable {
         guard let url = URL(string: a), let host = url.host, host.contains(".") else { return nil }
         let display = name.trimmingCharacters(in: .whitespaces)
         return WordPressSite(id: "wp-\(host.lowercased())", name: display.isEmpty ? host : display,
-                             baseURL: a, language: language, hentaiOnly: hentaiOnly)
+                             baseURL: a, language: language)
     }
 }
 
@@ -34,7 +33,6 @@ struct WordPressProvider: ContentProvider {
     let site: WordPressSite
     var id: String { site.id }
     var displayName: String { site.name }
-    var kinds: Set<ContentKind> { site.hentaiOnly ? [.hentai] : [.real, .hentai] }
     var language: Lang { site.language }
 
     // MARK: Arama
@@ -87,7 +85,7 @@ struct WordPressProvider: ContentProvider {
     }
 
     func searchURL(_ q: SearchQuery) -> URL? {
-        let terms = effectiveTerms(q).joined(separator: " ")
+        let terms = q.terms.joined(separator: " ")
         guard var c = URLComponents(string: site.baseURL + "/wp-json/wp/v2/posts") else { return nil }
         c.queryItems = [
             .init(name: "per_page", value: "20"),
@@ -106,13 +104,13 @@ struct WordPressProvider: ContentProvider {
         guard let url = searchURL(q) else { return [] }
         do {
             let data = try await HTTP.data(url)
-            return try Self.videos(from: data, site: site, kind: q.kind)
+            return try Self.videos(from: data, site: site)
         } catch HTTPError.status(400, _) {
             return []   // WordPress son sayfadan sonrasında 400 döndürür
         }
     }
 
-    static func videos(from data: Data, site: WordPressSite, kind: ContentKind) throws -> [Video] {
+    static func videos(from data: Data, site: WordPressSite) throws -> [Video] {
         let posts = try JSONDecoder().decode([Post].self, from: data)
         return posts.compactMap { p in
             guard !p.title.isEmpty, let page = URL(string: p.link) else { return nil }
@@ -124,7 +122,7 @@ struct WordPressProvider: ContentProvider {
                 return t.replacingOccurrences(of: "-", with: " ")
             }
             return Video(
-                providerID: site.id, remoteID: String(p.id), kind: kind, title: p.title,
+                providerID: site.id, remoteID: String(p.id), title: p.title,
                 thumbnail: p.thumbnail.flatMap(URL.init(string:)),
                 views: p.views,
                 addedAt: Fmt.isoDate(p.date_gmt),
