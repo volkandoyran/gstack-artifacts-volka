@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import worker, { relay } from '../relay/worker.js';
+import worker, { relay, imageProxy } from '../relay/worker.js';
 
 // Playwright hem yerel node_modules'tan hem de genel kurulumdan (NODE_PATH) yüklenebilsin.
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -29,7 +29,7 @@ const EPORNER = { videos: [
   { id: 'e3', title: 'Engellenmesi gereken liseli başlığı', keywords: '', views: 5, rate: '1', url: 'https://www.eporner.com/video-e3/x/', added: '2026-11-12 10:00:00', length_sec: 100, embed: 'https://www.eporner.com/embed/e3/', default_thumb: { src: 'https://img.test/e3.jpg' } },
 ] };
 const PORNHUB = { videos: [
-  { duration: '12:06', views: 90000, video_id: 'p1', rating: 88, title: 'Sabah Yürüyüşü Sahil Boyunca - HD', url: 'https://www.pornhub.com/view_video.php?viewkey=p1', default_thumb: 'https://img.test/p1.jpg', publish_date: '2026-11-09 10:00:00', tags: [{ tag_name: 'outdoor' }] },
+  { duration: '12:06', views: 90000, video_id: 'p1', rating: 88, title: 'Sabah Yürüyüşü Sahil Boyunca - HD', url: 'https://www.pornhub.com/view_video.php?viewkey=p1', default_thumb: 'https://ei.phncdn.com/p1.jpg', publish_date: '2026-11-09 10:00:00', tags: [{ tag_name: 'outdoor' }] },
   { duration: '8:20', views: 4000, video_id: 'p2', rating: 71, title: 'Havuz başında öğleden sonra', url: 'https://www.pornhub.com/view_video.php?viewkey=p2', default_thumb: 'https://img.test/p2.jpg', publish_date: '2026-11-11 10:00:00', tags: [] },
 ] };
 const REDTUBE = { videos: [
@@ -59,6 +59,8 @@ async function fakeUpstream(url) {
   if (u.hostname === 'www.xnxx.com') return respond(XNXX, 'text/html');
   if (u.hostname === 'www.doeda.com' && u.pathname.startsWith('/wp-json/')) return respond(JSON.stringify(u.searchParams.get('page') === '1' ? DOEDA : []), 'application/json');
   if (u.hostname === 'www.doeda.com' && u.pathname.endsWith('.jpeg')) return respond(thumb('Doeda', hueOf(u.pathname)), 'image/svg+xml');
+  // Telefonun doğrudan erişemediği (engelli) görsel sunucusu: aracı üzerinden gelir
+  if (u.hostname.endsWith('phncdn.com')) return respond(thumb('aracı', 200), 'image/svg+xml');
   if (u.hostname === 'www.doeda.com' || u.hostname === 'www.doeda.one') return respond(DOEDA_PAGE, 'text/html');
   return new Response('yok', { status: 404 });
 }
@@ -81,7 +83,9 @@ function startServer({ withRelay }) {
     const pathname = new URL(request.url).pathname;
     const response = pathname === '/r'
       ? (withRelay ? await relay(request, env, fakeUpstream) : new Response('yok', { status: 404 }))
-      : await worker.fetch(request, env);
+      : pathname === '/img'
+        ? (withRelay ? await imageProxy(request, env, fakeUpstream) : new Response('yok', { status: 404 }))
+        : await worker.fetch(request, env);
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(Buffer.from(await response.arrayBuffer()));
   });
@@ -137,6 +141,10 @@ try {
   const badges = await page.$$eval('#grid .badge.tl', (els) => els.map((e) => e.textContent));
   assert.ok(badges.some((b) => / \+1$/.test(b)), 'kopyası olan kartta +1 görünmeli');
   assert.ok(await page.$('.install'), 'Safari\'de kurulum önerisi görünmeli');
+  // Görsel sunucusu engelli (ei.phncdn.com tarayıcıdan açılmıyor): kapak aracıdan gelmeli
+  await page.waitForFunction(() => [...document.querySelectorAll('#grid img')].some((i) => i.src.includes('/img?u=') && i.naturalWidth > 0));
+  const proxied = await page.$$eval('#grid img', (els) => els.filter((i) => i.src.includes('/img?u=')).map((i) => decodeURIComponent(i.src)));
+  assert.ok(proxied.some((s) => s.includes('ei.phncdn.com/p1.jpg')), proxied.join(' | '));
   await shot(page, '2-kesfet.png');
 
   // Kategori + arama: Türk sitesine Türkçe, yabancıya İngilizce terim

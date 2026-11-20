@@ -202,7 +202,9 @@ test('ağ katmanı: aracı gereken istekler aracıdan geçer, yoksa anlaşılır
   await pornhub.search({ terms: ['hentai', 'x'], sort: 'newest', page: 2 }, relayed);
   const last = calls.at(-1)[0];
   assert.ok(last.startsWith('https://app.example/r?u=https%3A%2F%2Fwww.pornhub.com%2Fwebmasters%2Fsearch%3Fsearch%3Dhentai%2Bx'), last);
-  assert.equal(relayed.asset('http://www.doeda.com/a.jpg'), 'https://app.example/r?u=http%3A%2F%2Fwww.doeda.com%2Fa.jpg');
+  assert.equal(relayed.asset('http://www.doeda.com/a.jpg'), 'https://app.example/img?u=http%3A%2F%2Fwww.doeda.com%2Fa.jpg');
+  assert.equal(relayed.imageProxyURL('https://x.phncdn.com/a.jpg'), 'https://app.example/img?u=https%3A%2F%2Fx.phncdn.com%2Fa.jpg');
+  assert.equal(direct.imageProxyURL('https://x.phncdn.com/a.jpg'), null);
   assert.equal(relayed.asset('https://cdn/a.jpg'), 'https://cdn/a.jpg');
   assert.equal(wordpress(DOEDA).relayForSearch, true);       // http site
   assert.equal(wordpress(DOEDA_ONE).relayForSearch, false);  // https + CORS

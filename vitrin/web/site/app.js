@@ -69,6 +69,17 @@ function chip(label, on, onclick, extraClass = '') {
   return h('button', { class: `chip ${on ? 'on' : ''} ${extraClass}`, type: 'button', onclick }, label);
 }
 
+/** Video kapağı: önce doğrudan yüklenir; görsel sunucusu erişilemezse aracı üzerinden yeniden denenir. */
+function thumbImage(url) {
+  const img = h('img', { src: net.asset(url), alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
+  img.addEventListener('error', () => {
+    const proxied = net.imageProxyURL(url);
+    if (proxied && img.dataset.proxied !== '1') { img.dataset.proxied = '1'; img.src = proxied; }
+    else img.remove();   // gri kutu kalır
+  });
+  return img;
+}
+
 function card(v) {
   const extra = S.alternates.get(v.id)?.length || 0;
   const meta = [];
@@ -76,7 +87,7 @@ function card(v) {
   if (v.rating > 0) meta.push(`👍 %${Math.round(v.rating)}`);
   return h('button', { class: 'card', type: 'button', onclick: () => openPlayer(v) },
     h('span', { class: 'thumb' },
-      v.thumbnail && h('img', { src: net.asset(v.thumbnail), alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' }),
+      v.thumbnail && thumbImage(v.thumbnail),
       h('span', { class: 'badge tl' }, providerName(v.providerID) + (extra ? ` +${extra}` : '')),
       v.maxHeight && h('span', { class: 'badge tr dark' }, `${v.maxHeight}p`),
       v.durationSec > 0 && h('span', { class: 'badge br dark' }, clock(v.durationSec)),

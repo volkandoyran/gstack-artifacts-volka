@@ -69,6 +69,37 @@ export async function relay(request, env, upstreamFetch = fetch) {
   });
 }
 
+// Küçük resimler (video kapakları) için görsel aracısı. Görsel sunucuları bazı ülkelerde/ağlarda
+// erişime kapalı olduğundan, telefon görseli doğrudan alamazsa uygulama onu buradan ister.
+// Yalnızca aşağıdaki alan adlarından (ve alt alan adlarından) yalnızca resim dosyaları geçer;
+// Cloudflare'de bir gün önbellekte tutulur.
+const IMAGE_HOST_SUFFIXES = [
+  'phncdn.com', 'rdtcdn.com', 'xvideos-cdn.com', 'xnxx-cdn.com', 'eporner.com',
+  'doeda.com', 'doeda.one', 'customcdn.org',
+];
+const IMAGE_REFERERS = { 'phncdn.com': 'https://www.pornhub.com/', 'rdtcdn.com': 'https://www.redtube.com/',
+  'xvideos-cdn.com': 'https://www.xvideos.com/', 'xnxx-cdn.com': 'https://www.xnxx.com/', 'eporner.com': 'https://www.eporner.com/' };
+
+export async function imageProxy(request, env, upstreamFetch = fetch) {
+  if (request.method !== 'GET') return json({ error: 'Yalnızca GET.' }, 405);
+  let target;
+  try { target = new URL(new URL(request.url).searchParams.get('u') || ''); } catch { return json({ error: 'Geçersiz adres.' }, 400); }
+  const host = target.hostname.toLowerCase();
+  const suffixes = IMAGE_HOST_SUFFIXES.concat(list(env.EXTRA_HOSTS));
+  const match = suffixes.find((s) => host === s || host.endsWith('.' + s));
+  if (!/^https?:$/.test(target.protocol) || !match) return json({ error: `Görsel aracısı bu alan adına izin vermiyor: ${host}` }, 403);
+
+  const headers = { 'User-Agent': UA, 'Accept': 'image/avif,image/webp,image/*,*/*;q=0.8' };
+  if (IMAGE_REFERERS[match]) headers['Referer'] = IMAGE_REFERERS[match];
+  let upstream;
+  try { upstream = await upstreamFetch(target.href, { headers, redirect: 'follow', cf: { cacheTtl: 86400, cacheEverything: true } }); }
+  catch { return json({ error: `${host} adresine ulaşılamadı.` }, 502); }
+  const type = upstream.headers.get('Content-Type') || '';
+  if (!upstream.ok) return new Response(null, { status: upstream.status, headers: SECURITY });
+  if (!/^image\//i.test(type)) return json({ error: 'Yalnızca görseller geçer.' }, 415);
+  return new Response(upstream.body, { status: 200, headers: { 'Content-Type': type, 'Cache-Control': 'public, max-age=86400', ...SECURITY } });
+}
+
 function toBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -80,6 +111,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/r') return relay(request, env);
+    if (url.pathname === '/img') return imageProxy(request, env);
 
     if (url.pathname === '/vitrin.mobileconfig') {
       const icon = await env.ASSETS.fetch(new Request(new URL('/apple-touch-icon.png', url)));

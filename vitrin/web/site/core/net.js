@@ -44,10 +44,16 @@ export function createNet({ relayBase = null, fetchImpl = (...a) => fetch(...a) 
       return JSON.parse(await net.text(url, options));
     },
 
+    /** Görsel aracısının adresi (aracı yoksa null). */
+    imageProxyURL(url) {
+      if (!url || !net.relayBase) return null;
+      return `${net.relayBase.replace(/\/r$/, '/img')}?u=${encodeURIComponent(url)}`;
+    },
+
     /** Şifresiz (http) görseller https sayfada yüklenemez; aracı varsa oradan geçirilir. */
     asset(url) {
       if (!url) return url;
-      return url.startsWith('http://') && net.relayBase ? net.relayURL(url) : url;
+      return url.startsWith('http://') && net.relayBase ? net.imageProxyURL(url) : url;
     },
   };
   return net;

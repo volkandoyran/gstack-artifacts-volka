@@ -1,7 +1,7 @@
 // Aracı (Cloudflare Worker) ve kurulum profili testleri.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker, { relay } from '../relay/worker.js';
+import worker, { relay, imageProxy } from '../relay/worker.js';
 import { buildProfile } from '../relay/profile.js';
 
 const APP = 'https://vitrin.example.workers.dev';
@@ -116,4 +116,26 @@ test('IPA dağıtımı: SideStore/AltStore kaynağı ve indirme başlıkları', 
   assert.match(ipa.headers.get('Content-Disposition'), /attachment; filename="Vitrin.ipa"/);
 
   assert.equal((await worker.fetch(req('/ipa/kaynak.json'), assets(false))).status, 404, 'IPA yokken kaynak 404');
+});
+
+test('görsel aracısı: yalnızca izinli görsel sunucuları ve yalnızca resim', async () => {
+  const up = upstream('<svg/>', 'image/jpeg');
+  const res = await worker.fetch(req('/img?u=' + encodeURIComponent('https://pix-fl.phncdn.com/a/b.jpg?x=1')), {});
+  assert.ok([200, 502].includes(res.status), 'gerçek ağ olmadan 502 de olabilir');
+
+  const ok = await imageProxy(req('/img?u=' + encodeURIComponent('https://pix-fl.phncdn.com/a/b.jpg?x=1')), {}, up);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get('Content-Type'), 'image/jpeg');
+  assert.match(ok.headers.get('Cache-Control'), /max-age=86400/);
+  assert.equal(up.calls[0].init.headers.Referer, 'https://www.pornhub.com/');
+
+  for (const bad of ['https://evil.example/a.jpg', 'https://phncdn.com.evil.example/a.jpg', 'ftp://x.phncdn.com/a', 'bozuk']) {
+    const r = await imageProxy(req('/img?u=' + encodeURIComponent(bad)), {}, up);
+    assert.ok(r.status === 403 || r.status === 400, bad);
+  }
+  assert.equal(up.calls.length, 1, 'izinsiz adreslere istek gitmemeli');
+
+  assert.equal((await imageProxy(req('/img?u=' + encodeURIComponent('https://x.xvideos-cdn.com/v.mp4')), {}, upstream('x', 'video/mp4'))).status, 415, 'video geçmemeli');
+  assert.equal((await imageProxy(req('/img?u=' + encodeURIComponent('https://x.xvideos-cdn.com/a.jpg'), { method: 'POST', body: 'x' }), {}, up)).status, 405);
+  assert.equal((await imageProxy(req('/img?u=' + encodeURIComponent('https://ornek.com/a.jpg')), { EXTRA_HOSTS: 'ornek.com' }, upstream('<svg/>', 'image/png'))).status, 200);
 });
