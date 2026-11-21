@@ -20,6 +20,8 @@ import anthropic
 
 import entegrasyonlar
 import hafiza
+import yerel_ajan
+from yerel_model import YerelHata
 from bilgisayar import Bilgisayar, Durduruldu
 
 BETALAR = ["server-side-fallback-2026-07-01", "thinking-display-updates-2026-08-18"]
@@ -112,6 +114,23 @@ class Ayarlar:
     efor: str = "medium"           # low / medium / high / xhigh / max
     maks_adim: int = 80            # bir denemedeki en fazla model turu
     maks_uzun_kenar: int = 1568    # ekran görüntüsü çözünürlüğü (maliyet/doğruluk dengesi)
+    # Hangi işi hangi yapay zeka yapsın: "claude" (internet) veya "yerel" (Ollama/LM Studio, çevrimdışı)
+    eylem_saglayici: str = "claude"      # ekranı kullanan ajan
+    dogrulama_saglayici: str = "claude"  # "oldu mu?" kontrolü
+    hafiza_saglayici: str = "claude"     # hafızayı sadeleştirme
+    cevrimdisi: bool = False             # True: her şey yerel modelle
+    yerel_url: str = "http://localhost:11434/v1"
+    yerel_model: str = "qwen3-vl:8b"
+    yerel_koordinat: str = "0-1000"      # modele göre: "piksel" (Qwen2.5-VL) veya "0-1000" (Qwen3-VL)
+    yerel_uzun_kenar: int = 1280         # yerel modeller küçük görüntülerle daha iyi çalışır
+    yerel_maks_goruntu: int = 3          # bağlamda tutulacak en fazla ekran görüntüsü
+
+    def __post_init__(self):
+        if self.cevrimdisi:
+            self.eylem_saglayici = self.dogrulama_saglayici = self.hafiza_saglayici = "yerel"
+
+    def claude_gerekli(self) -> bool:
+        return "claude" in (self.eylem_saglayici, self.dogrulama_saglayici, self.hafiza_saglayici)
 
 
 @dataclass
@@ -130,8 +149,20 @@ class Ajan:
         self.log = log            # log(tur, metin) – tur: bilgi/dusunce/eylem/hata/basari
         self.sor = sor
         self.durdur = durdur
-        self.istemci = anthropic.Anthropic(api_key=api_anahtari) if api_anahtari else anthropic.Anthropic()
-        self.pc = Bilgisayar(maks_uzun_kenar=ayarlar.maks_uzun_kenar, durdur=durdur)
+        self.istemci = None
+        if ayarlar.claude_gerekli():
+            self.istemci = anthropic.Anthropic(api_key=api_anahtari) if api_anahtari else anthropic.Anthropic()
+        kenar = ayarlar.yerel_uzun_kenar if ayarlar.eylem_saglayici == "yerel" else ayarlar.maks_uzun_kenar
+        self.pc = Bilgisayar(maks_uzun_kenar=kenar, durdur=durdur)
+
+    def _yerele_gec(self, neden: str) -> bool:
+        """İnternet/Claude yoksa ve yerel model ayarlıysa her işi yerel modele devret."""
+        if not self.ay.yerel_model:
+            return False
+        self.log("hata", f"{neden} → Yerel yapay zekaya ({self.ay.yerel_model}) geçiyorum.")
+        self.ay.eylem_saglayici = self.ay.dogrulama_saglayici = self.ay.hafiza_saglayici = "yerel"
+        self.pc = Bilgisayar(maks_uzun_kenar=self.ay.yerel_uzun_kenar, durdur=self.durdur)
+        return True
 
     # ------------------------------------------------------------------ API
     def _istek(self, **kw):
@@ -140,7 +171,7 @@ class Ajan:
             try:
                 return self.istemci.beta.messages.create(
                     model=self.ay.model, betas=BETALAR, fallbacks="default", **kw)
-            except (anthropic.RateLimitError, anthropic.InternalServerError, anthropic.APIConnectionError) as e:
+            except (anthropic.RateLimitError, anthropic.InternalServerError) as e:
                 if bekleme is None or self.durdur.is_set():
                     raise
                 self.log("hata", f"Geçici API hatası ({type(e).__name__}), {bekleme} sn sonra yeniden denenecek…")
@@ -154,9 +185,24 @@ class Ajan:
             while True:
                 deneme += 1
                 self.log("bilgi", f"━━ Deneme {deneme}{'' if not israrla else (f' / {maks_deneme}' if maks_deneme else ' (sınırsız)')} ━━")
-                sonuc = self._deneme(gorev, uygulama, onceki)
+                self.log("bilgi", f"Beyin: {'Claude' if self.ay.eylem_saglayici == 'claude' else 'Yerel – ' + self.ay.yerel_model}")
+                try:
+                    if self.ay.eylem_saglayici == "yerel":
+                        sonuc = yerel_ajan.deneme(self, gorev, uygulama, onceki)
+                    else:
+                        sonuc = self._deneme(gorev, uygulama, onceki)
+                except anthropic.APIConnectionError:
+                    if self._yerele_gec("Claude'a ulaşılamadı (internet yok?)"):
+                        deneme -= 1
+                        continue
+                    raise
                 self.log("bilgi", "Sonuç kontrol ediliyor…")
-                d = self._dogrula(gorev, sonuc)
+                try:
+                    d = self._dogrula(gorev, sonuc)
+                except anthropic.APIConnectionError:
+                    if not self._yerele_gec("Claude'a ulaşılamadı"):
+                        raise
+                    d = self._dogrula(gorev, sonuc)
                 if d["basarili"]:
                     self.log("basari", f"✔ Başarılı: {d['gerekce']}")
                     return True
@@ -177,6 +223,9 @@ class Ajan:
             return False
         except anthropic.APIConnectionError:
             self.log("hata", "İnternet/API bağlantısı kurulamadı.")
+            return False
+        except YerelHata as e:
+            self.log("hata", str(e))
             return False
         finally:
             self._sadelestir()
@@ -293,6 +342,8 @@ class Ajan:
         if self.durdur.is_set():
             raise Durduruldu()
         time.sleep(1.0)
+        if self.ay.dogrulama_saglayici == "yerel":
+            return yerel_ajan.dogrula(self, gorev, sonuc.ozet, sonuc.ajan_basarili)
         yanit = self._istek(
             max_tokens=8000,
             output_config={"effort": "low", "format": {"type": "json_schema", "schema": DOGRULAMA_SEMASI}},
@@ -320,19 +371,20 @@ class Ajan:
     def _sadelestir(self):
         """Hafıza dosyası çok büyüdüyse Claude ile tekrarları birleştirip sadeleştir."""
         for ad in hafiza.sadelestirilmesi_gerekenler():
-            try:
-                yanit = self._istek(
-                    max_tokens=16000,
-                    output_config={"effort": "low"},
-                    messages=[{"role": "user", "content":
-                        "Aşağıdaki, bir masaüstü uygulamasını kullanırken öğrenilmiş derslerin listesi. "
+            istem = ("Aşağıdaki, bir masaüstü uygulamasını kullanırken öğrenilmiş derslerin listesi. "
                         "Tekrarları birleştir, çelişkilerde daha yeni olanı tut, işe yaramayanları at ve "
                         "konulara göre gruplanmış kısa maddeler halinde Markdown olarak yeniden yaz. "
                         "Somut kısayolları, menü yollarını ve tuzakları koru. Yalnızca yeni metni döndür.\n\n"
-                        + hafiza.oku(ad)}],
-                )
-                yeni = "".join(b.text for b in yanit.content if b.type == "text").strip()
-                if yanit.stop_reason == "end_turn" and len(yeni) > 200:
+                     + hafiza.oku(ad))
+            try:
+                if self.ay.hafiza_saglayici == "yerel":
+                    yeni, tamam = yerel_ajan.metin_uret(self, istem, maks_jeton=8192).strip(), True
+                else:
+                    yanit = self._istek(max_tokens=16000, output_config={"effort": "low"},
+                                        messages=[{"role": "user", "content": istem}])
+                    yeni = "".join(b.text for b in yanit.content if b.type == "text").strip()
+                    tamam = yanit.stop_reason == "end_turn"
+                if tamam and len(yeni) > 200:
                     yedek = hafiza.KLASOR / f"{ad}.yedek.md"
                     yedek.write_text(hafiza.oku(ad), encoding="utf-8")
                     hafiza.yaz(ad, yeni + "\n")

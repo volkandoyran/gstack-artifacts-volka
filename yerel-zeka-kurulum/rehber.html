@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yerel Zeka Rehberi</title>
+<style>
+:root{--bg:#f7f7f4;--kart:#fff;--yazi:#1d1f23;--soluk:#5d6470;--cizgi:#e2e2dc;--vurgu:#2f6fdb;--iyi:#1f8a4c;--kotu:#b4462f;--uyari-bg:#fff6dd;--uyari:#8a6200}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171b;--kart:#1e2127;--yazi:#e8e9ec;--soluk:#9aa1ad;--cizgi:#2e323a;--vurgu:#7aa7ff;--iyi:#6fd39a;--kotu:#ff8f7a;--uyari-bg:#2c2614;--uyari:#f0c96a}}
+:root[data-theme="dark"]{--bg:#15171b;--kart:#1e2127;--yazi:#e8e9ec;--soluk:#9aa1ad;--cizgi:#2e323a;--vurgu:#7aa7ff;--iyi:#6fd39a;--kotu:#ff8f7a;--uyari-bg:#2c2614;--uyari:#f0c96a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--yazi);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:24px 16px 80px}
+h1{font-size:1.9rem;margin:.2em 0}
+h2{margin-top:2.2em;padding-top:.6em;border-top:1px solid var(--cizgi);font-size:1.35rem}
+h3{font-size:1.05rem;margin:.2em 0 .4em}
+p.alt{color:var(--soluk);margin-top:0}
+nav{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0}
+nav a{font-size:.88rem;padding:4px 10px;border:1px solid var(--cizgi);border-radius:999px;color:var(--yazi);text-decoration:none;background:var(--kart)}
+a{color:var(--vurgu)}
+.kutu{background:var(--kart);border:1px solid var(--cizgi);border-radius:12px;padding:16px 18px;margin:12px 0}
+.ozet{border-left:4px solid var(--vurgu)}
+.uyari{background:var(--uyari-bg);border-color:transparent;color:var(--uyari)}
+.izgara{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.etiket{display:inline-block;font-size:.75rem;padding:1px 8px;border-radius:999px;background:var(--vurgu);color:var(--kart);margin-left:6px;vertical-align:middle}
+ul.arti,ul.eksi{list-style:none;padding:0;margin:.3em 0}
+ul.arti li::before{content:"+ ";color:var(--iyi);font-weight:700}
+ul.eksi li::before{content:"− ";color:var(--kotu);font-weight:700}
+.tablo{overflow-x:auto;margin:12px 0}
+table{border-collapse:collapse;width:100%;min-width:560px;background:var(--kart);border-radius:12px;overflow:hidden}
+th,td{padding:8px 10px;border-bottom:1px solid var(--cizgi);text-align:left;vertical-align:top;font-size:.93rem}
+th{background:color-mix(in srgb,var(--vurgu) 10%,var(--kart))}
+code,kbd{font-family:ui-monospace,Consolas,monospace;font-size:.88em;background:color-mix(in srgb,var(--yazi) 8%,transparent);padding:1px 5px;border-radius:5px}
+pre{background:color-mix(in srgb,var(--yazi) 7%,var(--kart));padding:12px;border-radius:10px;overflow-x:auto;font-size:.88rem}
+ol li{margin:.35em 0}
+.tema{position:fixed;top:10px;right:10px;font-size:.8rem;padding:4px 10px;border-radius:999px;border:1px solid var(--cizgi);background:var(--kart);color:var(--yazi);cursor:pointer}
+</style>
+</head>
+<body>
+<button class="tema" onclick="var r=document.documentElement;r.dataset.theme=(r.dataset.theme==='dark'||(!r.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches))?'light':'dark'">◐ Tema</button>
+<main>
+<h1>Yerel Zeka Rehberi</h1>
+<p class="alt">İnternetsiz çalışan bir yapay zekayı kendi bilgisayarına kurmak ve Usta'ya bağlamak için adım adım rehber. Bu sayfa internet olmadan da açılır.</p>
+
+<nav>
+<a href="#kisa">Kısa cevap</a><a href="#bilgisayar">Bilgisayar alırken</a><a href="#araclar">Araçlar</a>
+<a href="#modeller">Modeller</a><a href="#kurulum">Kurulum</a><a href="#usta">Usta'ya bağlama</a>
+<a href="#sorun">Sorun giderme</a><a href="#sinirlar">Sınırlar</a>
+</nav>
+
+<div class="kutu ozet" id="kisa">
+<h3>Kısa cevap</h3>
+<ol>
+<li><b>Motor:</b> <b>Ollama</b>. En kolayı bu. Arka planda kendiliğinden çalışır ve Usta doğrudan bağlanır.</li>
+<li><b>Model:</b> Ekranı görebilen <b>Qwen3-VL</b>. Ekran kartında 8 GB bellek varsa <code>qwen3-vl:8b</code>, 24 GB varsa <code>qwen3-vl:32b</code>.</li>
+<li><b>Nasıl:</b> <code>yerel-zeka-kurulum</code> klasöründeki <b>BASLAT.bat</b>'a çift tıkla ve <b>9 – Hepsini sırayla yap</b>'ı seç. Bilgisayarı inceler, öneri yapar, kurar, model indirir, test eder ve Usta'ya bağlar.</li>
+<li><b>En iyi düzen:</b> İnternet varken ekranı Claude kullanır, kontrol ve hafızayı yerel model yapar. İnternet yoksa Usta kendiliğinden tamamen yerel modele geçer.</li>
+</ol>
+<p>Kurulum ve model indirme için <b>bir kez</b> internet gerekir. Sonrası tamamen çevrimdışı çalışır.</p>
+</div>
+
+<h2 id="bilgisayar">1. Yeni bilgisayar alırken</h2>
+<p>Yerel yapay zekada en önemli parça <b>ekran kartının belleği (VRAM)</b>. Model bu belleğe sığarsa hızlı çalışır, sığmazsa normal RAM'e taşar ve 5–20 kat yavaşlar. İşlemci ikinci planda kalır.</p>
+<div class="tablo"><table>
+<tr><th>Bütçe sınıfı</th><th>Ekran kartı (VRAM)</th><th>RAM</th><th>Ne çalışır?</th><th>Usta (ekran kontrolü)</th></tr>
+<tr><td>Giriş</td><td>Yok veya 4–6 GB</td><td>16 GB</td><td>3–4B modeller, yavaş</td><td>Deneme amaçlı; Claude önerilir</td></tr>
+<tr><td>Orta</td><td>NVIDIA 8 GB (ör. RTX 4060 / 5060)</td><td>32 GB</td><td>7–8B modeller, akıcı</td><td><code>qwen3-vl:8b</code>, basit işler</td></tr>
+<tr><td><b>Önerilen</b></td><td><b>NVIDIA 16 GB</b> (ör. RTX 4060 Ti 16GB, 5060 Ti 16GB, 5070 Ti)</td><td>32 GB</td><td>12–24B modeller rahat</td><td><code>qwen3-vl:8b</code> hızlı, <code>mistral-small3.2</code></td></tr>
+<tr><td>Güçlü</td><td>NVIDIA 24–32 GB (ör. RTX 3090 / 4090 / 5090)</td><td>64 GB</td><td>27–32B modeller</td><td><code>qwen3-vl:32b</code>, en iyi yerel sonuç</td></tr>
+<tr><td>Mac</td><td>Apple Silicon (M3/M4…) birleşik bellek</td><td>32–64 GB+</td><td>Belleğin ~%70'i model için kullanılabilir</td><td>36 GB+ ile <code>qwen3-vl:30b</code></td></tr>
+</table></div>
+<div class="kutu uyari"><b>İpuçları:</b> NVIDIA kartlar en sorunsuz seçenek (CUDA). AMD kartlar da çalışır ama desteklenen modeller daha sınırlı. Model dosyaları büyük olduğu için en az <b>1 TB NVMe SSD</b> al. Dizüstü alacaksan ekran kartı belleğini (ör. "8 GB GDDR") ürün özelliklerinde kontrol et; aynı adı taşıyan dizüstü kartları masaüstü sürümlerinden daha yavaştır.</div>
+
+<h2 id="araclar">2. Araçlar: neden, artılar, eksiler</h2>
+<p>Bu araçların hepsi aynı modelleri (Llama, Qwen, Gemma, Mistral…) çalıştırabilir. Aralarındaki fark kolaylıkta, arayüzde ve kontrol düzeyinde.</p>
+<div class="izgara">
+<div class="kutu"><h3>Ollama <span class="etiket">Önerilen</span></h3>
+<p>Usta'nın yerel beyni için en uygun motor. Arka planda servis olarak çalışır.</p>
+<ul class="arti"><li>Kurulum ve model indirme çok kolay (<code>ollama pull</code>)</li><li>Usta'ya doğrudan bağlanır (OpenAI uyumlu API)</li><li>GPU'yu otomatik kullanır</li><li>Açık kaynak, ücretsiz</li></ul>
+<ul class="eksi"><li>Arayüzü sınırlı, daha çok komut satırıyla kullanılır</li><li>Varsayılan bağlam 4096 jeton, yani küçük (sihirbaz büyütür)</li></ul></div>
+<div class="kutu"><h3>LM Studio</h3>
+<p>Modelleri görsel olarak aramak, denemek ve karşılaştırmak için en rahat uygulama.</p>
+<ul class="arti"><li>Çok iyi arayüz ve model tarayıcı</li><li>Hangi modelin bilgisayarına sığacağını gösterir</li><li>OpenAI uyumlu sunucusu var</li><li>Mac'te MLX ile hızlı</li></ul>
+<ul class="eksi"><li>Kapalı kaynak</li><li>Sunucuyu elle başlatmak gerekir</li><li>Daha fazla kaynak kullanır</li></ul></div>
+<div class="kutu"><h3>llama.cpp</h3>
+<p>Ollama ve LM Studio'nun altında çalışan motor. İleri kullanıcılar için.</p>
+<ul class="arti"><li>En hızlı ve en hafif seçenek</li><li>Her ayar senin elinde</li><li>Açık kaynak</li></ul>
+<ul class="eksi"><li>Teknik: model dosyalarını (GGUF) elle indirmek gerekir</li><li>Yeni başlayanlar için zor</li></ul></div>
+<div class="kutu"><h3>Jan</h3>
+<p>Açık kaynak, ChatGPT benzeri, çevrimdışı çalışan sohbet uygulaması.</p>
+<ul class="arti"><li>Gizlilik odaklı, açık kaynak</li><li>Temiz sohbet ekranı</li></ul>
+<ul class="eksi"><li>Ekosistemi daha küçük</li><li>Görsel model desteği sınırlı</li></ul></div>
+<div class="kutu"><h3>GPT4All</h3>
+<p>Ekran kartı olmayan, zayıf bilgisayarlarda belgelerle sohbet etmek için en kolayı.</p>
+<ul class="arti"><li>Çok kolay, işlemcide iyi çalışır</li><li>LocalDocs ile kendi belgelerinle sohbet</li></ul>
+<ul class="eksi"><li>Görsel model yok, bu yüzden Usta'nın ekran kontrolü için uygun değil</li><li>winget paketi yok, siteden indirilir</li></ul></div>
+<div class="kutu"><h3>Open WebUI</h3>
+<p>Ollama'nın üstüne ChatGPT gibi bir web arayüzü ekler.</p>
+<ul class="arti"><li>ChatGPT'ye çok benzer arayüz</li><li>Belge yükleme, sohbet geçmişi, eklentiler</li></ul>
+<ul class="eksi"><li>Docker veya Python ile ayrı kurulum gerekir</li><li>Usta için gerekli değil</li></ul></div>
+</div>
+
+<h2 id="modeller">3. Model seçimi</h2>
+<p>Usta'nın ekranı kullanabilmesi için modelin <b>görsel (vision)</b> olması gerekir. Ekranda doğru yere tıklama becerisinde Qwen-VL ailesi açık arayla önde. Boyutlar ilk indirme boyutudur.</p>
+<div class="tablo"><table>
+<tr><th>Model</th><th>Boyut</th><th>Gereken VRAM (yaklaşık)</th><th>Ekranda tıklama</th><th>Not</th></tr>
+<tr><td><code>qwen3-vl:4b</code></td><td>3.3 GB</td><td>6 GB</td><td>Orta</td><td>Zayıf bilgisayarlar için Usta'nın en iyi seçeneği</td></tr>
+<tr><td><b><code>qwen3-vl:8b</code></b></td><td>6.2 GB</td><td>8–10 GB</td><td>İyi</td><td><b>Çoğu kişi için önerilen</b></td></tr>
+<tr><td><code>qwen3-vl:30b</code></td><td>20 GB</td><td>24 GB veya 48 GB+ RAM/Mac</td><td>İyi</td><td>MoE: büyük ama hızlı</td></tr>
+<tr><td><code>qwen3-vl:32b</code></td><td>21 GB</td><td>24 GB</td><td>Çok iyi</td><td>En güçlü yerel ekran kullanıcısı</td></tr>
+<tr><td><code>qwen2.5vl:7b</code></td><td>6.0 GB</td><td>8 GB</td><td>İyi</td><td>Eski nesil yedek; koordinat ayarı "piksel"</td></tr>
+<tr><td><code>mistral-small3.2:24b</code></td><td>15 GB</td><td>16–24 GB</td><td>Orta</td><td>Genel zekası iyi</td></tr>
+<tr><td><code>gemma3:12b</code></td><td>8.2 GB</td><td>12 GB</td><td>Zayıf</td><td>Türkçe sohbet ve "oldu mu?" kontrolü için iyi</td></tr>
+<tr><td><code>llama3.2-vision:11b</code></td><td>7.8 GB</td><td>12 GB</td><td>Zayıf</td><td>Meta'nın Llama ailesi; görseli anlatmada iyi</td></tr>
+<tr><td><code>qwen3:14b</code> / <code>gpt-oss:20b</code></td><td>9.3 / 14 GB</td><td>12 / 16 GB</td><td>Yok (yalnızca metin)</td><td>Sohbet, yazı ve kod için</td></tr>
+</table></div>
+<p>Yeni bir model çıktığında <code>modeller.json</code> dosyasına eklemen yeterli. Sihirbaz kodu değiştirmeden onu da önerir. Güncel liste için <a href="https://ollama.com/library">ollama.com/library</a> sayfasına bak.</p>
+
+<h2 id="kurulum">4. Kurulum adımları</h2>
+<h3>Windows (önerilen yol: sihirbaz)</h3>
+<ol>
+<li>Depoyu bilgisayara indir: GitHub'da <b>Code → Download ZIP</b> veya <code>git clone</code>. ZIP'i bir klasöre çıkar.</li>
+<li><code>yerel-zeka-kurulum\BASLAT.bat</code>'a çift tıkla. Windows "bilinmeyen yayımcı" uyarısı verirse <b>Ek bilgi → Yine de çalıştır</b>'a tıkla.</li>
+<li>Menüden <b>9</b>'u seç ve soruları yanıtla. Sırasıyla şunlar yapılır:
+  <ol>
+  <li>Donanım incelenir ve hangi modelin sığacağı hesaplanır.</li>
+  <li>Ollama, <code>winget</code> ile kurulur. Bu olmazsa resmi indirme sayfası açılır.</li>
+  <li>Bağlam penceresi büyütülür (<code>OLLAMA_CONTEXT_LENGTH</code>).</li>
+  <li>Seçtiğin model indirilir.</li>
+  <li>API test edilir.</li>
+  <li>Python ve Usta kurulur ve yerel modele bağlanır. İstersen masaüstüne kısayol oluşturulur.</li>
+  </ol></li>
+<li>Her şey <code>kurulum_gunlugu.txt</code> dosyasına kaydedilir. Bir şey ters giderse bu dosyaya bak.</li>
+</ol>
+<h3>Elle kurulum (Windows)</h3>
+<pre>winget install --id Ollama.Ollama -e
+setx OLLAMA_CONTEXT_LENGTH 16384
+:: Ollama'yı kapatıp yeniden aç, sonra:
+ollama pull qwen3-vl:8b
+ollama run qwen3-vl:8b "Merhaba"</pre>
+<h3>macOS / Linux</h3>
+<pre>cd yerel-zeka-kurulum
+bash kurulum.sh</pre>
+
+<h2 id="usta">5. Usta'ya bağlama</h2>
+<p>Sihirbaz bunu kendisi yapar. Elle yapmak istersen Usta'da <b>⚙ Ayarlar</b>'ı aç:</p>
+<div class="tablo"><table>
+<tr><th>Ayar</th><th>Değer</th></tr>
+<tr><td>Yerel sunucu adresi</td><td>Ollama: <code>http://localhost:11434/v1</code> · LM Studio: <code>http://localhost:1234/v1</code> · llama.cpp: <code>http://localhost:8080/v1</code> · Jan: <code>http://localhost:1337/v1</code></td></tr>
+<tr><td>Yerel model</td><td><b>Yerel zekayı test et</b> düğmesi yüklü modelleri listeler</td></tr>
+<tr><td>Yerel model koordinatı</td><td>Qwen3-VL: <code>0-1000</code> · Qwen2.5-VL ve diğerleri: <code>piksel</code></td></tr>
+<tr><td>Ekranı / Kontrolü / Hafızayı kim yapsın?</td><td>Her biri için <code>claude</code> veya <code>yerel</code></td></tr>
+</table></div>
+<div class="izgara">
+<div class="kutu"><h3>Hibrit (önerilen)</h3><p>Ekran: <b>claude</b> · Kontrol: <b>yerel</b> · Hafıza: <b>yerel</b></p><p>En yüksek başarı, daha düşük maliyet. İnternet kesilirse Usta otomatik olarak yerel modele geçer.</p></div>
+<div class="kutu"><h3>Tamamen çevrimdışı</h3><p>Ana ekranda <b>Çevrimdışı (yalnızca yerel zeka)</b> kutusunu işaretle.</p><p>Ücretsiz ve gizli: hiçbir şey internete gitmez. Ama daha az başarılıdır.</p></div>
+</div>
+<p><b>Kendini geliştirme:</b> Usta'nın hafızası (<code>hafiza/*.md</code>) hangi beyni kullandığından bağımsızdır. Claude'un öğrendiği dersleri yerel model de kullanır, yerel modelin öğrendiklerini de Claude. Usta yerel modelle sınırlı değildir: yeni bir motor veya model çıktığında yalnızca adresi ya da model adını değiştirirsin. Blender ve Photoshop betik köprüleri de iki beyinle birlikte çalışır.</p>
+
+<h2 id="sorun">6. Sorun giderme</h2>
+<div class="tablo"><table>
+<tr><th>Belirti</th><th>Çözüm</th></tr>
+<tr><td>"Yerel yapay zeka sunucusuna ulaşılamadı"</td><td>Başlat menüsünden Ollama'yı aç; sistem tepsisinde lama simgesi görünmeli. LM Studio kullanıyorsan Developer sekmesinden sunucuyu başlat.</td></tr>
+<tr><td>Çok yavaş (her adım 30 sn ve üstü)</td><td>Model ekran kartına sığmıyor. <code>ollama ps</code> çıktısındaki PROCESSOR sütununda "100% GPU" görmelisin. Daha küçük bir model seç.</td></tr>
+<tr><td>Yanlış yere tıklıyor</td><td>Koordinat ayarını kontrol et (Qwen3-VL için <code>0-1000</code>). Daha büyük bir model dene. Blender/Photoshop betik köprüsünü kur. Önemli işlerde ekranı Claude kullansın.</td></tr>
+<tr><td>"Geçerli JSON bulunamadı" hatası sık çıkıyor</td><td>Model talimat takibinde zayıf. Qwen3-VL veya Mistral Small gibi daha yetenekli bir modele geç.</td></tr>
+<tr><td>Eski ekranları unutuyor veya kesiliyor</td><td>Bağlamı büyüt: sihirbaz → 8 Gelişmiş → 2 → <code>32768</code>. Ardından Ollama'yı yeniden başlat.</td></tr>
+<tr><td>C: diski doldu</td><td>Sihirbaz → 8 → 1 ile modelleri başka bir diske taşı.</td></tr>
+</table></div>
+
+<h2 id="sinirlar">7. Bilmen gerekenler</h2>
+<div class="kutu uyari">
+<ul>
+<li>Yerel modeller bilgisayar kontrolünde bugün Claude'un oldukça gerisinde. Yerel mod <b>deneysel</b>: basit işlerde iş görür, karmaşık Blender veya Photoshop işlerinde sık sık başarısız olabilir. "Başarana kadar dene" modu ve hafıza bu açığı kısmen kapatır.</li>
+<li>Bu rehberdeki model adları ve boyutları Kasım 2026'ya ait. Bilgisayarını aldığında daha iyi modeller çıkmış olabilir. ollama.com/library sayfasına bakıp <code>modeller.json</code>'a ekleyebilirsin.</li>
+<li>Kurulum dosyaları (.exe) bu klasöre konmadı. Hem çok büyükler hem de bilgisayarını alana kadar eskimiş olurlar. Sihirbaz her zaman en güncel sürümü resmi kaynaktan (winget veya resmi site) indirir.</li>
+</ul>
+</div>
+</main>
+</body>
+</html>

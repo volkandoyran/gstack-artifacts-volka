@@ -17,7 +17,10 @@ from tkinter import messagebox, scrolledtext, simpledialog, ttk
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hafiza  # noqa: E402
+import dataclasses  # noqa: E402
+
 from ajan import Ajan, Ayarlar  # noqa: E402
+from yerel_model import HAZIR_ADRESLER, YerelHata, YerelModel  # noqa: E402
 
 AYAR_DOSYASI = Path(__file__).resolve().parent / "ayarlar.json"
 UYGULAMALAR = ["Blender", "Photoshop", "GIMP", "Krita", "Inkscape", "Genel"]
@@ -27,7 +30,7 @@ RENKLER = {"bilgi": "#9aa4b2", "dusunce": "#e6e6e6", "eylem": "#7cc4ff",
 
 def ayarlari_oku() -> dict:
     try:
-        return json.loads(AYAR_DOSYASI.read_text(encoding="utf-8"))
+        return json.loads(AYAR_DOSYASI.read_text(encoding="utf-8-sig"))
     except Exception:
         return {}
 
@@ -87,6 +90,11 @@ class UstaPenceresi:
         self.maks_deneme.insert(0, str(self.ayar.get("maks_deneme", 5)))
         self.maks_deneme.pack(side="left", padx=4)
         ttk.Label(mod, text="deneme (0 = sınırsız)").pack(side="left")
+        mod2 = ttk.Frame(self.kok, padding=(10, 2))
+        mod2.pack(fill="x")
+        self.cevrimdisi = tk.BooleanVar(value=bool(self.ayar.get("cevrimdisi", False)))
+        ttk.Checkbutton(mod2, text="Çevrimdışı (yalnızca yerel zeka: Ollama / LM Studio)",
+                        variable=self.cevrimdisi).pack(side="left")
 
         dugmeler = ttk.Frame(self.kok, padding=10)
         dugmeler.pack(fill="x")
@@ -177,16 +185,17 @@ class UstaPenceresi:
     def _calistir(self, gorev: str, israrla: bool, maks_deneme: int):
         if self.calisiyor:
             return
-        anahtar = self._api_anahtari()
-        if not anahtar:
-            messagebox.showwarning("Usta", "API anahtarı olmadan çalışamam.")
-            return
         uyg = self.uygulama.get().strip() or "Genel"
-        self.ayar.update(uygulama=uyg, israrla=israrla, maks_deneme=maks_deneme)
+        self.ayar.update(uygulama=uyg, israrla=israrla, maks_deneme=maks_deneme, cevrimdisi=self.cevrimdisi.get())
         ayarlari_yaz(self.ayar)
-        ayar = Ayarlar(model=self.ayar.get("model", "claude-opus-5-5"), efor=self.ayar.get("efor", "medium"),
-                       maks_adim=int(self.ayar.get("maks_adim", 80)),
-                       maks_uzun_kenar=int(self.ayar.get("maks_uzun_kenar", 1568)))
+        ayar = self._ayarlar_nesnesi()
+        anahtar = None
+        if ayar.claude_gerekli():
+            anahtar = self._api_anahtari()
+            if not anahtar:
+                messagebox.showwarning("Usta", "Claude için API anahtarı gerekli. Anahtar yoksa "
+                                               "'Çevrimdışı (yerel zeka)' seçeneğini işaretle.")
+                return
         self.durdur.clear()
         self.calisiyor = True
         self.baslat_d.configure(state="disabled")
@@ -205,6 +214,18 @@ class UstaPenceresi:
                 self.kuyruk.put(("bitti",))
 
         threading.Thread(target=is_, daemon=True).start()
+
+    def _ayarlar_nesnesi(self) -> Ayarlar:
+        degerler = {}
+        for f in dataclasses.fields(Ayarlar):
+            if f.name in self.ayar and self.ayar[f.name] != "":
+                v = self.ayar[f.name]
+                try:
+                    degerler[f.name] = (int(v) if f.type == "int" else
+                                        (v in (True, "1", "true", "True", "evet")) if f.type == "bool" else str(v))
+                except ValueError:
+                    pass
+        return Ayarlar(**degerler)
 
     def _baslat(self):
         gorev = self.girdi.get("1.0", "end").strip()
@@ -286,29 +307,54 @@ class UstaPenceresi:
         p = tk.Toplevel(self.kok)
         p.title("Ayarlar")
         p.configure(bg="#1e1f24")
-        alanlar = {
-            "api_anahtari": ("API anahtarı", self.ayar.get("api_anahtari", ""), True),
-            "model": ("Model", self.ayar.get("model", "claude-opus-5-5"), False),
-            "efor": ("Efor (low/medium/high/xhigh/max)", self.ayar.get("efor", "medium"), False),
-            "maks_adim": ("Deneme başına en fazla adım", self.ayar.get("maks_adim", 80), False),
-            "maks_uzun_kenar": ("Ekran görüntüsü uzun kenarı (px)", self.ayar.get("maks_uzun_kenar", 1568), False),
-        }
+        a = self.ayar
+        alanlar = [  # (anahtar, etiket, varsayılan, seçenekler veya None, gizli)
+            ("api_anahtari", "Claude API anahtarı", "", None, True),
+            ("model", "Claude modeli", "claude-opus-5-5", None, False),
+            ("efor", "Claude eforu", "medium", ["low", "medium", "high", "xhigh", "max"], False),
+            ("eylem_saglayici", "Ekranı kim kullansın?", "claude", ["claude", "yerel"], False),
+            ("dogrulama_saglayici", "Sonucu kim kontrol etsin?", "claude", ["claude", "yerel"], False),
+            ("hafiza_saglayici", "Hafızayı kim düzenlesin?", "claude", ["claude", "yerel"], False),
+            ("yerel_url", "Yerel sunucu adresi", "http://localhost:11434/v1", list(HAZIR_ADRESLER.values()), False),
+            ("yerel_model", "Yerel model", "qwen3-vl:8b", None, False),
+            ("yerel_koordinat", "Yerel model koordinatı", "0-1000", ["0-1000", "piksel"], False),
+            ("yerel_uzun_kenar", "Yerel ekran görüntüsü (px)", 1280, None, False),
+            ("maks_adim", "Deneme başına en fazla adım", 80, None, False),
+            ("maks_uzun_kenar", "Claude ekran görüntüsü (px)", 1568, None, False),
+        ]
         girisler = {}
-        for i, (anahtar, (etiket, deger, gizli)) in enumerate(alanlar.items()):
-            ttk.Label(p, text=etiket).grid(row=i, column=0, sticky="w", padx=8, pady=4)
-            e = ttk.Entry(p, width=36, show="*" if gizli else "")
-            e.insert(0, str(deger))
-            e.grid(row=i, column=1, padx=8, pady=4)
-            girisler[anahtar] = e
+        for i, (k, etiket, vars_, secenek, gizli) in enumerate(alanlar):
+            ttk.Label(p, text=etiket).grid(row=i, column=0, sticky="w", padx=8, pady=3)
+            e = ttk.Combobox(p, values=secenek, width=34) if secenek else ttk.Entry(p, width=36, show="*" if gizli else "")
+            e.insert(0, str(a.get(k, vars_)))
+            e.grid(row=i, column=1, padx=8, pady=3)
+            girisler[k] = e
+        durum = ttk.Label(p, text="Ipucu: Qwen2.5-VL için koordinat 'piksel', Qwen3-VL için '0-1000'.", wraplength=420)
+        durum.grid(row=len(alanlar), column=0, columnspan=2, sticky="w", padx=8)
+
+        def test():
+            try:
+                ms = YerelModel(girisler["yerel_url"].get().strip(), "").modeller()
+                girisler["yerel_model"].destroy()
+                cb = ttk.Combobox(p, values=ms, width=34)
+                cb.set(a.get("yerel_model") if a.get("yerel_model") in ms else (ms[0] if ms else ""))
+                cb.grid(row=[x[0] for x in alanlar].index("yerel_model"), column=1, padx=8, pady=3)
+                girisler["yerel_model"] = cb
+                durum.configure(text=f"✔ Bağlandı. Yüklü modeller: {', '.join(ms) or '(yok – ollama pull ile indir)'}")
+            except YerelHata as e:
+                durum.configure(text=f"✘ {e}")
 
         def kaydet():
             for k, e in girisler.items():
                 v = e.get().strip()
-                self.ayar[k] = int(v) if k in ("maks_adim", "maks_uzun_kenar") and v.isdigit() else v
-            ayarlari_yaz(self.ayar)
+                a[k] = int(v) if v.isdigit() and k in ("maks_adim", "maks_uzun_kenar", "yerel_uzun_kenar") else v
+            ayarlari_yaz(a)
             p.destroy()
 
-        ttk.Button(p, text="Kaydet", command=kaydet).grid(row=len(alanlar), column=1, sticky="e", padx=8, pady=8)
+        alt = ttk.Frame(p)
+        alt.grid(row=len(alanlar) + 1, column=0, columnspan=2, sticky="e", padx=8, pady=8)
+        ttk.Button(alt, text="Yerel zekayı test et", command=test).pack(side="left", padx=4)
+        ttk.Button(alt, text="Kaydet", command=kaydet).pack(side="left")
 
     def calis(self):
         self.kok.mainloop()

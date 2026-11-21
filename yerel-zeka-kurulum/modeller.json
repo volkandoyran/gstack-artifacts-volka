@@ -1,0 +1,97 @@
+{
+  "_aciklama": "Kurulum sihirbazının kullandığı katalog. Yeni bir model/araç çıktığında buraya ekleyebilirsin; sihirbaz kodu değiştirmeden onu da önerir. Boyutlar ollama.com/library sayfalarından alınmıştır (Kasım 2026).",
+  "araclar": [
+    {
+      "ad": "Ollama",
+      "onerilen": true,
+      "winget": "Ollama.Ollama",
+      "indirme": "https://ollama.com/download",
+      "api": "http://localhost:11434/v1",
+      "neden": "Usta'nın yerel beyni için en uygun motor: arka planda servis olarak çalışır, tek komutla model indirir, OpenAI uyumlu API sunar.",
+      "artilar": ["Kurulumu ve model indirmesi çok kolay (ollama pull)", "Arka planda kendiliğinden çalışır, Usta doğrudan bağlanır", "NVIDIA/AMD GPU'yu ve Apple Silicon'u otomatik kullanır", "Açık kaynak, ücretsiz, geniş model kütüphanesi"],
+      "eksiler": ["Grafik arayüzü sınırlı, daha çok komut satırı", "Varsayılan bağlam (4096) küçük; sihirbaz bunu büyütür", "İnce ayar seçenekleri llama.cpp kadar fazla değil"]
+    },
+    {
+      "ad": "LM Studio",
+      "onerilen": false,
+      "winget": "ElementLabs.LMStudio",
+      "indirme": "https://lmstudio.ai",
+      "api": "http://localhost:1234/v1",
+      "neden": "Modelleri görsel olarak aramak, denemek ve karşılaştırmak için en rahat masaüstü uygulaması. Usta'ya da bağlanabilir.",
+      "artilar": ["Çok iyi grafik arayüz, model tarayıcı ve sohbet ekranı", "Hangi modelin bilgisayarına sığacağını gösterir", "OpenAI uyumlu yerel sunucu", "Mac'te MLX ile hızlı"],
+      "eksiler": ["Kapalı kaynak (kişisel kullanım ücretsiz)", "Sunucuyu elle başlatmak gerekir (Developer sekmesi veya 'lms server start')", "Ollama'dan daha fazla kaynak tüketir"]
+    },
+    {
+      "ad": "llama.cpp",
+      "onerilen": false,
+      "winget": null,
+      "indirme": "https://github.com/ggml-org/llama.cpp/releases",
+      "api": "http://localhost:8080/v1",
+      "neden": "Ollama ve LM Studio'nun altında yatan motor. En yüksek hız ve kontrol isteyen ileri kullanıcılar için.",
+      "artilar": ["En hızlı ve en hafif seçenek", "Her ayar elinde (katman bölme, nicemleme, bağlam)", "Açık kaynak, CPU'da bile iyi çalışır"],
+      "eksiler": ["Teknik: komut satırı ve GGUF dosyalarını elle indirme", "Güncellemeyi kendin yaparsın", "Yeni başlayanlar için zor"]
+    },
+    {
+      "ad": "Jan",
+      "onerilen": false,
+      "winget": "Jan.Jan",
+      "indirme": "https://jan.ai",
+      "api": "http://localhost:1337/v1",
+      "neden": "Tamamen açık kaynak, ChatGPT benzeri çevrimdışı sohbet uygulaması.",
+      "artilar": ["Açık kaynak ve gizlilik odaklı", "Temiz sohbet arayüzü", "OpenAI uyumlu yerel API"],
+      "eksiler": ["Ekosistemi Ollama/LM Studio'dan küçük", "Görsel (vision) model desteği daha sınırlı"]
+    },
+    {
+      "ad": "GPT4All",
+      "onerilen": false,
+      "winget": null,
+      "indirme": "https://www.nomic.ai/gpt4all",
+      "api": "http://localhost:4891/v1",
+      "neden": "Ekran kartı olmayan, zayıf bilgisayarlarda belgelerinle sohbet etmek için en kolay seçenek.",
+      "artilar": ["Çok kolay kurulum, CPU'da iyi çalışır", "LocalDocs: kendi belgelerinle sohbet"],
+      "eksiler": ["Model seçimi daha az", "Görsel model yok: Usta'nın ekran kontrolü için uygun değil", "winget paketi yok, siteden indirilir"]
+    },
+    {
+      "ad": "Open WebUI",
+      "onerilen": false,
+      "winget": null,
+      "indirme": "https://github.com/open-webui/open-webui",
+      "api": null,
+      "neden": "Ollama'nın üstüne ChatGPT gibi bir web arayüzü ekler (sohbet geçmişi, belge yükleme, çoklu model).",
+      "artilar": ["ChatGPT'ye çok benzer arayüz", "Belge/RAG, kullanıcı hesapları, eklentiler"],
+      "eksiler": ["Ayrı kurulum gerekir (Docker veya Python)", "Usta için gerekli değil, yalnızca sohbet içindir"]
+    }
+  ],
+  "modeller": [
+    {"tag": "qwen3-vl:4b", "tur": "gorsel", "boyut_gb": 3.3, "koordinat": "0-1000", "tiklama": "orta", "araclar": true,
+     "not": "Zayıf/orta bilgisayarlar için Usta'nın en iyi seçeneği. Ekranı görür, araç çağırır."},
+    {"tag": "qwen3-vl:8b", "tur": "gorsel", "boyut_gb": 6.2, "koordinat": "0-1000", "tiklama": "iyi", "araclar": true,
+     "not": "8 GB+ ekran kartı için önerilen Usta beyni: hız/başarı dengesi iyi."},
+    {"tag": "qwen3-vl:30b", "tur": "gorsel", "boyut_gb": 20, "koordinat": "0-1000", "tiklama": "iyi", "araclar": true,
+     "not": "MoE (uzman karışımı) model: büyük ama hızlı. 24 GB ekran kartı veya 48 GB+ RAM / Mac için."},
+    {"tag": "qwen3-vl:32b", "tur": "gorsel", "boyut_gb": 21, "koordinat": "0-1000", "tiklama": "cok_iyi", "araclar": true,
+     "not": "24 GB+ ekran kartında en güçlü yerel ekran kullanıcısı."},
+    {"tag": "qwen2.5vl:7b", "tur": "gorsel", "boyut_gb": 6.0, "koordinat": "piksel", "tiklama": "iyi", "araclar": false,
+     "not": "Ekranda yer bulmada (grounding) kanıtlanmış eski nesil. qwen3-vl sorun çıkarırsa yedek."},
+    {"tag": "qwen2.5vl:32b", "tur": "gorsel", "boyut_gb": 21, "koordinat": "piksel", "tiklama": "cok_iyi", "araclar": false,
+     "not": "24 GB+ ekran kartı için güçlü yedek."},
+    {"tag": "mistral-small3.2:24b", "tur": "gorsel", "boyut_gb": 15, "koordinat": "piksel", "tiklama": "orta", "araclar": true,
+     "not": "Genel zekası iyi, görsel + araç desteği var; tıklama konumunda Qwen kadar isabetli değil."},
+    {"tag": "gemma3:4b", "tur": "gorsel", "boyut_gb": 3.4, "koordinat": "piksel", "tiklama": "zayif", "araclar": false,
+     "not": "Google'ın hafif modeli: sohbet ve görsel anlatma iyi, ekranda tıklama zayıf. Doğrulama rolü için uygun."},
+    {"tag": "gemma3:12b", "tur": "gorsel", "boyut_gb": 8.2, "koordinat": "piksel", "tiklama": "zayif", "araclar": false,
+     "not": "Türkçe sohbet ve 'oldu mu?' kontrolü için iyi; tıklama zayıf."},
+    {"tag": "gemma3:27b", "tur": "gorsel", "boyut_gb": 17, "koordinat": "piksel", "tiklama": "orta", "araclar": false,
+     "not": "Güçlü genel model; 24 GB ekran kartı için."},
+    {"tag": "llama3.2-vision:11b", "tur": "gorsel", "boyut_gb": 7.8, "koordinat": "piksel", "tiklama": "zayif", "araclar": false,
+     "not": "Meta'nın Llama ailesi: görseli anlatmada iyi, ekranda tıklamada zayıf."},
+    {"tag": "qwen3:8b", "tur": "metin", "boyut_gb": 5.2, "koordinat": null, "tiklama": null, "araclar": true,
+     "not": "Yalnızca metin: genel sohbet, yazı, kod. Ekranı göremez."},
+    {"tag": "qwen3:14b", "tur": "metin", "boyut_gb": 9.3, "koordinat": null, "tiklama": null, "araclar": true,
+     "not": "12-16 GB ekran kartı için güçlü metin modeli."},
+    {"tag": "gpt-oss:20b", "tur": "metin", "boyut_gb": 14, "koordinat": null, "tiklama": null, "araclar": true,
+     "not": "OpenAI'nin açık modeli: akıl yürütme güçlü. 16 GB+ ekran kartı."},
+    {"tag": "qwen3:32b", "tur": "metin", "boyut_gb": 20, "koordinat": null, "tiklama": null, "araclar": true,
+     "not": "24 GB ekran kartı için en güçlü metin seçeneklerinden."}
+  ]
+}

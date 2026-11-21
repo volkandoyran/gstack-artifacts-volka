@@ -39,6 +39,18 @@ Windows'ta `pywin32` kuruluysa (requirements ile gelir) ve Photoshop açıksa ot
 
 `pip install SpeechRecognition pyaudio` — ses tanıma için ses kaydın Google'a gönderilir.
 
+## Yerel (çevrimdışı) zeka
+
+Usta yalnızca Claude ile sınırlı değil: Ollama, LM Studio, llama.cpp veya Jan üzerinde çalışan bir
+yerel modelle de çalışır. Kurulum için `../yerel-zeka-kurulum/BASLAT.bat` sihirbazını kullan.
+
+- **⚙ Ayarlar** penceresinde ekran kullanma, sonucu kontrol etme ve hafızayı düzenleme işlerinin her
+  biri için ayrı ayrı `claude` ya da `yerel` seçebilirsin.
+- **Çevrimdışı** kutusu işaretliyse her işi yerel model yapar.
+- İnternet kesilirse Usta otomatik olarak yerel modele geçer.
+- Hafıza ortaktır: Claude'un öğrendiklerini yerel model de kullanır, yerel modelin öğrendiklerini de Claude.
+- Yerel mod deneysel: yerel görsel modeller ekranda doğru yere tıklamada Claude'dan zayıftır.
+
 ## Güvenlik
 
 - Usta **gerçek fare ve klavyeni** kullanır. Çalışırken bilgisayarı kullanma.
@@ -69,4 +81,5 @@ dene" modu çok sayıda istek yapabilir; Anthropic konsolundan harcama limiti ko
 - `bilgisayar.py` – ekran görüntüsü, fare/klavye
 - `hafiza.py` – öğrenilen dersler
 - `entegrasyonlar.py` – Blender/Photoshop betik köprüleri
+- `yerel_model.py`, `yerel_ajan.py` – yerel (çevrimdışı) model bağlantısı ve ajan döngüsü
 - `blender_eklentisi/usta_koprusu.py` – Blender eklentisi
