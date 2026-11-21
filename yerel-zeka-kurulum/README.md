@@ -22,6 +22,9 @@ adım adım kuran ve **Usta**'ya bağlayan kurulum asistanı.
 
 ## Sihirbaz menüsü
 
+Sihirbaz hiçbir şeyi sormadan kurmaz: her kurulum ve indirmeden önce onay ister.
+
+- **P** – Yalnızca planı göster: hiçbir şey kurmadan ne kurulacağını, indirme boyutunu ve gereken disk alanını gösterir
 1. Bilgisayarımı incele ve öneri al
 2. Araçları karşılaştır (Ollama, LM Studio, llama.cpp, Jan, GPT4All, Open WebUI)
 3. Ollama'yı kur (+ bağlam penceresini büyütür)
@@ -30,7 +33,7 @@ adım adım kuran ve **Usta**'ya bağlayan kurulum asistanı.
 6. Diğer araçları kur
 7. Usta'yı kur ve yerel zekaya bağla (hibrit veya tamamen çevrimdışı)
 8. Gelişmiş: modelleri başka diske taşı, bağlam, ağ erişimi, güncelleme
-9. Hepsini sırayla yap
+9. Hepsini sırayla yap (önce planı gösterir, her adımda onay ister)
 
 Kurulum dosyaları (.exe) bilerek eklenmedi: hem çok büyükler hem de çabuk eskiyorlar. Sihirbaz
 her seferinde en güncel sürümü resmi kaynaktan indirir. Kurulumdan sonra internet gerekmez.

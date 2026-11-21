@@ -49,6 +49,7 @@ function Internet-Var {
 }
 
 function Winget-Kur($id, $ad, $yedekUrl) {
+    if (-not (Evet "$ad bilgisayarına kurulacak. Onaylıyor musun?")) { Uyari "$ad kurulmadı (senin seçimin)."; return $false }
     if ($id -and (Komut-Var "winget")) {
         Bilgi "$ad winget ile kuruluyor ($id)…"
         & winget install --id $id -e --accept-package-agreements --accept-source-agreements | Out-Host
@@ -148,7 +149,7 @@ function Oneri-Hesapla {
     $modeller = $Katalog.modeller
     # Ekran kartına sığarsa hızlı; sığmazsa RAM'de (CPU) yavaş çalışır
     function Sigar($m) {
-        if ($vram -ge 4 -and ($m.boyut_gb * 1.2 + 1) -le $vram) { return "GPU" }
+        if ($vram -ge 4 -and ($m.boyut_gb + 1.5) -le $vram) { return "GPU" }   # +1.5 GB: bağlam (KV önbelleği)
         if (($m.boyut_gb * 1.3) -le ($d.RamGB * 0.6)) { return "CPU" }
         return $null
     }
@@ -156,8 +157,16 @@ function Oneri-Hesapla {
               ForEach-Object { $y = Sigar $_; if ($y) { $_ | Add-Member -NotePropertyName yer -NotePropertyValue $y -Force -PassThru } })
     $metin  = @($modeller | Where-Object { $_.tur -eq "metin" } |
               ForEach-Object { $y = Sigar $_; if ($y) { $_ | Add-Member -NotePropertyName yer -NotePropertyValue $y -Force -PassThru } })
-    # Önce GPU'ya sığanlar, sonra en büyüğü (genelde en akıllısı)
-    $usta = $gorsel | Sort-Object @{e = { if ($_.yer -eq "GPU") { 0 } else { 1 } } }, @{e = { $_.boyut_gb }; Descending = $true } | Select-Object -First 1
+    # Usta için: GPU'ya sığanlar arasında ekranda tıklaması en iyi olan, eşitse daha büyüğü, o da eşitse
+    # katalogda önce gelen (daha yeni nesil). Hiçbiri GPU'ya sığmıyorsa işlemcide en hızlısı (en küçüğü).
+    $sira = @{ "cok_iyi" = 0; "iyi" = 1; "orta" = 2 }
+    $katalogSira = @{}; for ($i = 0; $i -lt $modeller.Count; $i++) { $katalogSira[$modeller[$i].tag] = $i }
+    $gpuda = @($gorsel | Where-Object { $_.yer -eq "GPU" })
+    if ($gpuda.Count -gt 0) {
+        $usta = $gpuda | Sort-Object @{e = { $sira[$_.tiklama] } }, @{e = { $_.boyut_gb }; Descending = $true }, @{e = { $katalogSira[$_.tag] } } | Select-Object -First 1
+    } else {
+        $usta = $gorsel | Where-Object { $_.tiklama -ne "orta" -or $_.boyut_gb -lt 5 } | Sort-Object @{e = { $_.boyut_gb } }, @{e = { $katalogSira[$_.tag] } } | Select-Object -First 1
+    }
     $sohbet = $metin | Sort-Object @{e = { if ($_.yer -eq "GPU") { 0 } else { 1 } } }, @{e = { $_.boyut_gb }; Descending = $true } | Select-Object -First 1
     $kademe = "Zayıf"
     if ($vram -ge 20) { $kademe = "Çok güçlü" } elseif ($vram -ge 12) { $kademe = "Güçlü" } elseif ($vram -ge 8) { $kademe = "Orta-iyi" } elseif ($d.RamGB -ge 16) { $kademe = "Orta (yalnızca işlemci)" }
@@ -254,6 +263,9 @@ function Model-Indir {
         $s = $s.Trim(); if (-not $s) { continue }
         $tag = $s
         if ($s -match '^\d+$' -and [int]$s -ge 1 -and [int]$s -le $liste.Count) { $tag = $liste[[int]$s - 1].tag }
+        $k = $liste | Where-Object { $_.tag -eq $tag } | Select-Object -First 1
+        $boyut = "?"; if ($k) { $boyut = "$($k.boyut_gb)" }
+        if (-not (Evet "$tag indirilecek (~$boyut GB). Onaylıyor musun?")) { continue }
         Bilgi "İndiriliyor: $tag (büyük modeller uzun sürebilir; kesilirse tekrar çalıştır, kaldığı yerden devam eder)"
         & ollama pull $tag
         if ($LASTEXITCODE -eq 0) { Iyi "$tag hazır."; $script:IndirilenModeller += $tag } else { Hata "$tag indirilemedi." }
@@ -410,8 +422,31 @@ function Gelismis {
     }
 }
 
+# ------------------------------------------------------- P. yalnızca plan
+function Plan-Goster {
+    Baslik "P) Kurulum planı – hiçbir şey kurulmaz, yalnızca gösterilir"
+    if (-not $script:Oneri) { Donanim-Incele }
+    $o = $script:Oneri
+    $adim = 1
+    $durum = "kurulu değil → kurulacak"; if (Komut-Var "ollama") { $durum = "zaten kurulu" }
+    Bilgi "$adim) Ollama ($durum). Kaynak: winget 'Ollama.Ollama' veya ollama.com"; $adim++
+    Bilgi "$adim) OLLAMA_CONTEXT_LENGTH ortam değişkeni 16384 (güçlü kartta 32768) yapılır"; $adim++
+    if ($o.Usta) { Bilgi "$adim) Model indirilir: $($o.Usta.tag) (~$($o.Usta.boyut_gb) GB)"; $adim++ }
+    Bilgi "$adim) Test: Ollama API'sine kısa bir 'merhaba' isteği gönderilir"; $adim++
+    $py = "bulunamadı → kurulacak (winget 'Python.Python.3.12')"; $bulunan = Python-Bul; if ($bulunan) { $py = "var: $bulunan" }
+    Bilgi "$adim) Python $py"; $adim++
+    Bilgi "$adim) Usta'nın Python paketleri .venv klasörüne kurulur, ayarlar.json yerel modele bağlanır"; $adim++
+    Bilgi "$adim) İsteğe bağlı: masaüstü kısayolu"
+    Bilgi ""
+    Bilgi "Her adımda tek tek onay istenir; istemediğin adımı atlayabilirsin."
+    $toplam = 1; if ($o.Usta) { $toplam += $o.Usta.boyut_gb }
+    Bilgi "Tahmini toplam indirme: ~$([math]::Round($toplam)) GB. Gereken boş disk: ~$([math]::Round($toplam * 1.5 + 5)) GB"
+}
+
 # ---------------------------------------------------------------- ana menü
 function Hepsi {
+    Plan-Goster
+    if (-not (Evet "Bu plana göre başlayalım mı?")) { return }
     Donanim-Incele; Bekle
     Ollama-Kur; Bekle
     Model-Indir; Bekle
@@ -422,7 +457,8 @@ function Hepsi {
 while ($true) {
     Clear-Host
     Baslik "Yerel Zeka Kurulum Sihirbazı – çevrimdışı çalışan yapay zeka"
-    Bilgi " 9) HEPSİNİ SIRAYLA YAP (önerilen yol)"
+    Bilgi " P) Sadece planı göster (hiçbir şey kurmaz)"
+    Bilgi " 9) HEPSİNİ SIRAYLA YAP (her adımda onay ister)"
     Bilgi ""
     Bilgi " 1) Bilgisayarımı incele ve öneri al"
     Bilgi " 2) Araçları karşılaştır (neden / artılar / eksiler)"
@@ -445,6 +481,7 @@ while ($true) {
             "7" { Usta-Kur }
             "8" { Gelismis }
             "9" { Hepsi }
+            { $_ -in @("P", "p") } { Plan-Goster }
             "0" { try { Stop-Transcript | Out-Null } catch {}; exit 0 }
             default { }
         }
