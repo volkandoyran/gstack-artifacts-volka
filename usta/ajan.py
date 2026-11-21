@@ -18,6 +18,7 @@ from typing import Callable
 
 import anthropic
 
+import eklentiler as eklenti_sistemi
 import entegrasyonlar
 import hafiza
 import yerel_ajan
@@ -124,6 +125,7 @@ class Ayarlar:
     yerel_koordinat: str = "0-1000"      # modele göre: "piksel" (Qwen2.5-VL) veya "0-1000" (Qwen3-VL)
     yerel_uzun_kenar: int = 1280         # yerel modeller küçük görüntülerle daha iyi çalışır
     yerel_maks_goruntu: int = 3          # bağlamda tutulacak en fazla ekran görüntüsü
+    eklentiler: str = "hassas_tiklama,internet"   # virgülle ayrılmış etkin eklentiler
 
     def __post_init__(self):
         if self.cevrimdisi:
@@ -154,6 +156,34 @@ class Ajan:
             self.istemci = anthropic.Anthropic(api_key=api_anahtari) if api_anahtari else anthropic.Anthropic()
         kenar = ayarlar.yerel_uzun_kenar if ayarlar.eylem_saglayici == "yerel" else ayarlar.maks_uzun_kenar
         self.pc = Bilgisayar(maks_uzun_kenar=kenar, durdur=durdur)
+
+        # Eklentiler: araçlarını hem Claude'a hem yerel modele tanıt
+        self.eklentiler = eklenti_sistemi.yukle(ayarlar.eklentiler.split(","), log)
+        self.eklenti_araci: dict = {}
+        self.araclar = list(ARACLAR)
+        temel_adlar = {a.get("name") for a in ARACLAR}
+        for mod in self.eklentiler:
+            for arac in getattr(mod, "ARACLAR", []):
+                if arac["name"] in temel_adlar or arac["name"] in self.eklenti_araci:
+                    log("hata", f"Eklenti aracı adı çakışıyor, atlandı: {arac['name']}")
+                    continue
+                self.eklenti_araci[arac["name"]] = mod
+                self.araclar.append({k: arac[k] for k in ("name", "description", "input_schema")})
+        if self.eklentiler:
+            log("bilgi", "Eklentiler: " + ", ".join(getattr(m, "AD", m.__name__) for m in self.eklentiler))
+
+    def eklenti_istemi(self) -> str:
+        parcalar = [m.ISTEM for m in self.eklentiler if getattr(m, "ISTEM", "")]
+        return ("\n\n=== EKLENTİLER ===\n" + "\n\n".join(parcalar)) if parcalar else ""
+
+    def _olay(self, ad: str, **veri):
+        for m in self.eklentiler:
+            f = getattr(m, "olay", None)
+            if f:
+                try:
+                    f(ad, self, **veri)
+                except Exception as e:
+                    self.log("hata", f"Eklenti olayı hatası ({getattr(m, 'AD', m.__name__)}): {e}")
 
     def _yerele_gec(self, neden: str) -> bool:
         """İnternet/Claude yoksa ve yerel model ayarlıysa her işi yerel modele devret."""
@@ -186,6 +216,7 @@ class Ajan:
                 deneme += 1
                 self.log("bilgi", f"━━ Deneme {deneme}{'' if not israrla else (f' / {maks_deneme}' if maks_deneme else ' (sınırsız)')} ━━")
                 self.log("bilgi", f"Beyin: {'Claude' if self.ay.eylem_saglayici == 'claude' else 'Yerel – ' + self.ay.yerel_model}")
+                self._olay("deneme_basladi", gorev=gorev, uygulama=uygulama)
                 try:
                     if self.ay.eylem_saglayici == "yerel":
                         sonuc = yerel_ajan.deneme(self, gorev, uygulama, onceki)
@@ -203,6 +234,7 @@ class Ajan:
                     if not self._yerele_gec("Claude'a ulaşılamadı"):
                         raise
                     d = self._dogrula(gorev, sonuc)
+                self._olay("gorev_bitti", gorev=gorev, uygulama=uygulama, basarili=bool(d["basarili"]))
                 if d["basarili"]:
                     self.log("basari", f"✔ Başarılı: {d['gerekce']}")
                     return True
@@ -234,6 +266,8 @@ class Ajan:
     def _deneme(self, gorev: str, uygulama: str, onceki: list[str]) -> DenemeSonucu:
         hafiza_metni = "\n\n".join(f"## {ad}\n{ic}" for ad, ic in hafiza.tumunu_oku().items()) or "(henüz yok)"
         sistem = SISTEM.format(gen=self.pc.ss_boyut[0], yuk=self.pc.ss_boyut[1], hafiza=hafiza_metni)
+        sistem = sistem.replace("=== HAFIZA:", self.eklenti_istemi().lstrip("\n") + "\n\n=== HAFIZA:", 1) \
+            if self.eklentiler else sistem
         metin = f"Uygulama: {uygulama}\nGörev: {gorev}"
         if onceki:
             metin += ("\n\nBu görev daha önce denendi ama tamamlanamadı. Aynı hatalara düşme:\n\n"
@@ -248,7 +282,7 @@ class Ajan:
             yanit = self._istek(
                 max_tokens=16000,
                 system=sistem,
-                tools=ARACLAR,
+                tools=self.araclar,
                 messages=mesajlar,
                 thinking={"type": "adaptive", "display": "updates"},
                 output_config={"effort": self.ay.efor},
@@ -288,6 +322,12 @@ class Ajan:
         return sonuc
 
     def _arac_calistir(self, b, sonuc: DenemeSonucu, onceki_hata: bool) -> dict:
+        r = self._arac_calistir_ic(b, sonuc, onceki_hata)
+        if b.name not in ("ders_kaydet", "kullaniciya_sor", "gorev_bitti", "screenshot", "zoom", "cursor_position"):
+            self._olay("eylem", arac=b.name, girdi=dict(b.input or {}), hata=bool(r.get("is_error")))
+        return r
+
+    def _arac_calistir_ic(self, b, sonuc: DenemeSonucu, onceki_hata: bool) -> dict:
         r: dict = {"type": "tool_result", "tool_use_id": b.id}
         g = b.input or {}
         if b.toolset_name == "computer":
@@ -331,9 +371,18 @@ class Ajan:
                 sonuc.ozet = g.get("ozet", "")
                 self.log("bilgi", f"Ajan: {sonuc.ozet}")
                 r["content"] = "Tamam."
+            elif b.name in self.eklenti_araci:
+                self.log("eylem", f"{b.name} {json.dumps(g, ensure_ascii=False)[:300] if g else ''}")
+                icerik = self.eklenti_araci[b.name].calistir(b.name, g, self)
+                r["content"] = icerik if isinstance(icerik, list) else str(icerik)
             else:
                 r.update(content=f"Bilinmeyen araç: {b.name}", is_error=True)
+        except Durduruldu:
+            raise
         except Exception as e:
+            if type(e).__name__ == "FailSafeException":
+                self.durdur.set()
+                raise Durduruldu()
             r.update(content=f"Hata: {e}", is_error=True)
         return r
 
@@ -366,6 +415,44 @@ class Ajan:
         except json.JSONDecodeError:
             return {"basarili": sonuc.ajan_basarili, "gerekce": "Kontrol yanıtı okunamadı; ajanın beyanı esas alındı.",
                     "sonraki_deneme_icin_ipucu": ""}
+
+    # ------------------------------------------------------------ alıştırma
+    def _metin_uret(self, istem: str, saglayici: str) -> str:
+        if saglayici == "yerel":
+            return yerel_ajan.metin_uret(self, istem)
+        yanit = self._istek(max_tokens=8000, output_config={"effort": "low"},
+                            messages=[{"role": "user", "content": istem}])
+        return "".join(b.text for b in yanit.content if b.type == "text")
+
+    def alistir(self, uygulama: str, sayi: int = 5, maks_deneme: int = 3) -> dict:
+        """Kendi kendine eğitim: uygulama için alıştırma görevleri üretir ve sırayla dener.
+        Her görevden öğrenilenler hafızaya, (deneyim_kaydi açıksa) başarılı adımlar eğitim verisine yazılır."""
+        from yerel_model import json_cikar
+
+        self.log("bilgi", f"🏋 {uygulama} için {sayi} alıştırma hazırlanıyor…")
+        istem = (f"'{uygulama}' masaüstü uygulamasını kullanmayı öğrenen bir yapay zeka asistanı için {sayi} alıştırma "
+                 "görevi yaz. Kolaydan zora sırala. Her görev tek başına yapılabilir, ekranda sonucu görülerek "
+                 "doğrulanabilir ve güvenli olsun: yeni/boş bir belge veya sahnede çalışılsın, kullanıcının dosyaları "
+                 "silinmesin veya değiştirilmesin. Aşağıdaki hafızada zaten iyi bilinen işleri tekrarlama; zayıf "
+                 "görünen konulara ağırlık ver.\n\nHafıza:\n" + (hafiza.oku(uygulama)[-4000:] or "(boş)") +
+                 '\n\nYALNIZCA şu JSON\'u döndür: {"gorevler": ["...", "..."]}')
+        try:
+            saglayici = "yerel" if self.ay.eylem_saglayici == "yerel" else "claude"
+            gorevler = [str(g) for g in json_cikar(self._metin_uret(istem, saglayici)).get("gorevler", [])][:sayi]
+        except Exception as e:
+            self.log("hata", f"Alıştırmalar üretilemedi: {e}")
+            return {}
+        sonuclar = {}
+        for i, g in enumerate(gorevler, 1):
+            if self.durdur.is_set():
+                break
+            self.log("sen", f"\n🏋 Alıştırma {i}/{len(gorevler)}: {g}")
+            sonuclar[g] = self.gorev(g, uygulama, israrla=True, maks_deneme=maks_deneme)
+        basarili = sum(sonuclar.values())
+        self.log("basari" if basarili else "hata", f"🏋 Alıştırma bitti: {basarili}/{len(sonuclar)} başarılı.")
+        hafiza.ekle(uygulama, f"Alıştırma özeti: {basarili}/{len(sonuclar)} başarılı. Başarısızlar: "
+                    + ("; ".join(g for g, ok in sonuclar.items() if not ok) or "yok"))
+        return sonuclar
 
     # --------------------------------------------------------- sadeleştirme
     def _sadelestir(self):

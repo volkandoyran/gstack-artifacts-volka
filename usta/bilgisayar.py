@@ -82,6 +82,8 @@ class Bilgisayar:
         olcek_jeton = math.sqrt(GORSEL_JETON_SINIRI * 28 * 28 / (w * h)) * 0.97
         self.olcek = min(1.0, olcek_kenar, olcek_jeton)
         self.ss_boyut = (int(w * self.olcek), int(h * self.olcek))
+        self.son_goruntu: Image.Image | None = None   # yapay zekanın gördüğü son ekran (eğitim kaydı için)
+        self.goruntu_no = 0
 
     # ---------- yardımcılar ----------
     def _kontrol(self):
@@ -106,7 +108,9 @@ class Bilgisayar:
         return Image.frombytes("RGB", ham.size, ham.bgra, "raw", "BGRX")
 
     def ekran_goruntusu_pil(self) -> Image.Image:
-        return self._yakala().resize(self.ss_boyut, Image.LANCZOS)
+        self.son_goruntu = self._yakala().resize(self.ss_boyut, Image.LANCZOS)
+        self.goruntu_no += 1
+        return self.son_goruntu
 
     def ekran_goruntusu(self) -> list[dict]:
         return self._gorsel_blok(self.ekran_goruntusu_pil())

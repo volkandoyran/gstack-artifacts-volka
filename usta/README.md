@@ -51,6 +51,25 @@ yerel modelle de çalışır. Kurulum için `../yerel-zeka-kurulum/BASLAT.bat` s
 - Hafıza ortaktır: Claude'un öğrendiklerini yerel model de kullanır, yerel modelin öğrendiklerini de Claude.
 - Yerel mod deneysel: yerel görsel modeller ekranda doğru yere tıklamada Claude'dan zayıftır.
 
+## Eklentiler (🧩)
+
+Eklentiler Usta'ya yeni yetenekler kazandırır. Hem Claude hem de yerel model bunları kullanır.
+Ana ekrandaki **🧩 Eklentiler** düğmesinden açıp kapatabilirsin.
+
+| Eklenti | Ne yapar | Varsayılan |
+|---|---|---|
+| `hassas_tiklama` | **Doğru yere tıklama:** ekranı harf/rakam ızgarasına böler ("D7 hücresine tıkla", gerekirse alt hücreye kadar büyütür), ekrandaki yazıyı OCR ile bulup üstüne tıklar ("File"a tıkla), Windows'ta düğme ve menüleri adıyla bulur. Özellikle yerel modeller için büyük fark yaratır. | Açık |
+| `internet` | **İnternete bağlanma:** web'de arar (DuckDuckGo, yedek olarak Wikipedia; API anahtarı gerekmez) ve sayfa okur. Usta bir işi bilmiyorsa belgelere bakar, öğrendiğini hafızaya yazar. | Açık |
+| `kodlama` | **Kodlama:** Python kodu yazar ve çalıştırır, dosya okur/yazar. Yalnızca `usta_calisma/` klasöründe çalışır ve her kodu çalıştırmadan önce sana sorar. | Kapalı |
+| `deneyim_kaydi` | **Eğitim verisi:** başarıyla doğrulanan her görevin ekran görüntülerini ve eylemlerini kaydeder. Bu veriyle yerel modele gerçek eğitim (LoRA ince ayarı) yapılabilir; nasıl yapılacağı `egitim_verisi/EGITIM.md`'de. Ekran görüntüleri kişisel bilgi içerebilir. | Kapalı |
+
+**🏋 Alıştır:** Usta seçili uygulama için kolaydan zora alıştırma görevleri üretir ve sırayla dener.
+Hafızasına bakıp zayıf olduğu konulara ağırlık verir. Öğrendikleri hafızaya, başarılı adımlar
+(deneyim kaydı açıksa) eğitim verisine yazılır. Alıştırmaları yeni ve boş bir belgede veya sahnede yapar.
+
+**Kendi eklentini yaz:** `eklentiler/` klasörüne bir `.py` dosyası bırak. Nasıl yazılacağı
+`eklentiler/__init__.py`'nin başında anlatılıyor; hazır eklentiler de örnek olarak kullanılabilir.
+
 ## Güvenlik
 
 - Usta **gerçek fare ve klavyeni** kullanır. Çalışırken bilgisayarı kullanma.
@@ -82,4 +101,5 @@ dene" modu çok sayıda istek yapabilir; Anthropic konsolundan harcama limiti ko
 - `hafiza.py` – öğrenilen dersler
 - `entegrasyonlar.py` – Blender/Photoshop betik köprüleri
 - `yerel_model.py`, `yerel_ajan.py` – yerel (çevrimdışı) model bağlantısı ve ajan döngüsü
+- `eklentiler/` – eklentiler (hassas tıklama, internet, kodlama, deneyim kaydı) ve eklenti sistemi
 - `blender_eklentisi/usta_koprusu.py` – Blender eklentisi

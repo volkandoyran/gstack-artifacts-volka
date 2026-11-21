@@ -43,7 +43,7 @@ class UstaPenceresi:
     def __init__(self):
         self.kok = tk.Tk()
         self.kok.title("Usta")
-        self.kok.geometry("600x660")
+        self.kok.geometry("700x680")
         self.kok.configure(bg="#1e1f24")
         self.kuyruk: queue.Queue = queue.Queue()
         self.durdur = threading.Event()
@@ -67,8 +67,9 @@ class UstaPenceresi:
         self.uygulama = ttk.Combobox(ust, values=UYGULAMALAR, width=18)
         self.uygulama.set(self.ayar.get("uygulama", "Blender"))
         self.uygulama.grid(row=0, column=1, sticky="w", padx=6)
-        ttk.Button(ust, text="📘 Hafıza", command=self._hafizayi_ac).grid(row=0, column=3, sticky="e", padx=4)
-        ttk.Button(ust, text="⚙ Ayarlar", command=self._ayarlar).grid(row=0, column=4, sticky="e")
+        ttk.Button(ust, text="🧩 Eklentiler", command=self._eklentiler).grid(row=0, column=3, sticky="e", padx=4)
+        ttk.Button(ust, text="📘 Hafıza", command=self._hafizayi_ac).grid(row=0, column=4, sticky="e", padx=4)
+        ttk.Button(ust, text="⚙ Ayarlar", command=self._ayarlar).grid(row=0, column=5, sticky="e")
         ust.columnconfigure(2, weight=1)
 
         ttk.Label(self.kok, text="Ne yapayım?", padding=(10, 0)).pack(anchor="w")
@@ -102,8 +103,10 @@ class UstaPenceresi:
         self.baslat_d.pack(side="left")
         self.ses_d = ttk.Button(dugmeler, text="🎤 Söyle", command=self._sesle)
         self.ses_d.pack(side="left", padx=6)
-        self.kesfet_d = ttk.Button(dugmeler, text="🧭 Keşfet ve öğren", command=self._kesfet)
+        self.kesfet_d = ttk.Button(dugmeler, text="🧭 Keşfet", command=self._kesfet)
         self.kesfet_d.pack(side="left")
+        self.alistir_d = ttk.Button(dugmeler, text="🏋 Alıştır", command=self._alistir)
+        self.alistir_d.pack(side="left", padx=6)
         self.durdur_d = ttk.Button(dugmeler, text="■ Durdur", command=self._durdur, state="disabled")
         self.durdur_d.pack(side="left", padx=6)
 
@@ -182,7 +185,7 @@ class UstaPenceresi:
                 ayarlari_yaz(self.ayar)
         return anahtar
 
-    def _calistir(self, gorev: str, israrla: bool, maks_deneme: int):
+    def _calistir(self, gorev: str, israrla: bool, maks_deneme: int, alistirma: int = 0):
         if self.calisiyor:
             return
         uyg = self.uygulama.get().strip() or "Genel"
@@ -200,6 +203,7 @@ class UstaPenceresi:
         self.calisiyor = True
         self.baslat_d.configure(state="disabled")
         self.kesfet_d.configure(state="disabled")
+        self.alistir_d.configure(state="disabled")
         self.durdur_d.configure(state="normal")
         self._yaz("sen", f"\n▶ [{uyg}] {gorev}")
         self._kucult()
@@ -207,7 +211,10 @@ class UstaPenceresi:
         def is_():
             try:
                 ajan = Ajan(ayar, self._log, self._sor, self.durdur, api_anahtari=anahtar)
-                ajan.gorev(gorev, uyg, israrla=israrla, maks_deneme=maks_deneme)
+                if alistirma:
+                    ajan.alistir(uyg, sayi=alistirma, maks_deneme=maks_deneme or 3)
+                else:
+                    ajan.gorev(gorev, uyg, israrla=israrla, maks_deneme=maks_deneme)
             except Exception as e:
                 self._log("hata", f"Beklenmeyen hata: {type(e).__name__}: {e}")
             finally:
@@ -238,6 +245,37 @@ class UstaPenceresi:
             maks = 5
         self._calistir(gorev, self.israrla.get(), maks)
 
+    def _alistir(self):
+        uyg = self.uygulama.get().strip() or "Genel"
+        sayi = simpledialog.askinteger(
+            "Alıştır", f"Usta {uyg} için kendine alıştırma görevleri üretip deneyecek ve öğrendiklerini kaydedecek.\n"
+                       "Kaç alıştırma yapılsın?", initialvalue=5, minvalue=1, maxvalue=50, parent=self.kok)
+        if sayi:
+            self._calistir(f"{uyg} alıştırması ({sayi} görev)", israrla=True, maks_deneme=3, alistirma=sayi)
+
+    def _eklentiler(self):
+        import eklentiler as eklenti_sistemi
+
+        p = tk.Toplevel(self.kok)
+        p.title("Eklentiler")
+        p.configure(bg="#1e1f24")
+        acik = {a.strip() for a in str(self.ayar.get("eklentiler", "hassas_tiklama,internet")).split(",")}
+        ttk.Label(p, text="Usta'ya yetenek ekleyen eklentiler. Kendi eklentini eklentiler/ klasörüne bırakabilirsin.",
+                  wraplength=460).pack(anchor="w", padx=10, pady=(10, 6))
+        degiskenler = {}
+        for ad, aciklama in eklenti_sistemi.mevcut():
+            v = tk.BooleanVar(value=ad in acik)
+            ttk.Checkbutton(p, text=f"{ad} – {aciklama}", variable=v).pack(anchor="w", padx=10, pady=2)
+            degiskenler[ad] = v
+
+        def kaydet():
+            self.ayar["eklentiler"] = ",".join(ad for ad, v in degiskenler.items() if v.get())
+            ayarlari_yaz(self.ayar)
+            p.destroy()
+            self._yaz("bilgi", f"Etkin eklentiler: {self.ayar['eklentiler'] or '(yok)'}")
+
+        ttk.Button(p, text="Kaydet", command=kaydet).pack(anchor="e", padx=10, pady=10)
+
     def _kesfet(self):
         uyg = self.uygulama.get().strip() or "Genel"
         gorev = (f"{uyg} uygulamasını keşfet ve kullanmayı öğren. Uygulamayı aç (açık değilse), ana menüleri, "
@@ -255,6 +293,7 @@ class UstaPenceresi:
         self.calisiyor = False
         self.baslat_d.configure(state="normal")
         self.kesfet_d.configure(state="normal")
+        self.alistir_d.configure(state="normal")
         self.durdur_d.configure(state="disabled")
         self._buyut()
 

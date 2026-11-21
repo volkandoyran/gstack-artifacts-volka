@@ -4,6 +4,9 @@ pyautogui
 pillow
 pyperclip
 pywin32; sys_platform == "win32"
+# İsteğe bağlı – hassas tıklama eklentisi için:
+# rapidocr_onnxruntime      (ekrandaki yazıyı bulma, çevrimdışı OCR)
+# uiautomation              (yalnızca Windows: pencere öğelerini adıyla bulma)
 # İsteğe bağlı – sesli komut için:
 # SpeechRecognition
 # pyaudio

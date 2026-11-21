@@ -346,6 +346,16 @@ function Usta-Kur {
     if ($LASTEXITCODE -ne 0) { Hata "Paketler kurulamadı."; return }
     Iyi "Usta paketleri kuruldu."
 
+    # İsteğe bağlı eklenti paketleri (hassas tıklama eklentisi için)
+    Bilgi ""
+    Bilgi "Hassas tıklama eklentisi iki ücretsiz paketle daha iyi çalışır:"
+    Bilgi "  - rapidocr_onnxruntime: ekrandaki yazıyı bulup üstüne tıklama (OCR, çevrimdışı, ~60 MB)"
+    Bilgi "  - uiautomation: Windows pencerelerindeki düğme/menüleri adıyla bulma"
+    if (Evet "Bu paketleri kurayım mı?") {
+        & (Join-Path $venv "Scripts\pip.exe") install -q rapidocr_onnxruntime uiautomation
+        if ($LASTEXITCODE -eq 0) { Iyi "Eklenti paketleri kuruldu." } else { Uyari "Eklenti paketleri kurulamadı; Usta ızgara yöntemiyle yine çalışır." }
+    }
+
     # Yerel model seçimi
     $yuklu = @()
     try { $yuklu = @((Invoke-RestMethod "$OllamaApi/api/tags").models | ForEach-Object { $_.name }) } catch {}
