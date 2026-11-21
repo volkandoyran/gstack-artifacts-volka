@@ -1,0 +1,5 @@
+# API anahtarı burada: asla yükleme
+ayarlar.json
+.venv/
+__pycache__/
+*.yedek.md
